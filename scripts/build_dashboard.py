@@ -221,7 +221,7 @@ def build():
                            "本仓库每日抓取累积，历史自 2026-08-23 起在此逐日生长。",
                     "unit": "美元/小时", "freq": "日频",
                     "source": "Silicon Data · SiliconIndex", "data": p_gpu},
-            "fms": {"title": "⑧ 美银基金经理调查：拥挤交易与反向交易",
+            "fms": {"title": "⑦ 美银基金经理调查：拥挤交易与反向交易",
                     "sub": "BofA Global FMS 月度问卷。现金水位是老牌反向指标"
                            "（<4.0% 触发 sell signal）；拥挤度看的是共识有多挤，"
                            "反向交易看的是没人站的那一边。" + fms_stale,
@@ -229,7 +229,7 @@ def build():
                     "tables": fms_tables,
                     "source": "BofA Global Fund Manager Survey（派生数字口径，不含原图）",
                     "data": p_fms},
-            "normalized": {"title": "⑨ 跨资产归一对比",
+            "normalized": {"title": "⑧ 跨资产归一对比",
                            "sub": "所选区间的起点 = 100，对数坐标；切换区间基期会跟着走。"
                                   "看的是相对赔率，不是绝对价格。",
                            "unit": "指数 (区间起点=100)", "freq": "日频", "log": True,
