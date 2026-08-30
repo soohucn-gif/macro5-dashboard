@@ -1,0 +1,92 @@
+name: 数据更新
+
+on:
+  schedule:
+    # 每日 23:37 UTC ≈ 北京 07:37 次日。晚于美股收盘与 FRED H.15 当日发布(20:15 UTC)。
+    - cron: "37 23 * * *"
+    # 每月 2 号 12:23 UTC，补一次上月月度快照（Damodaran 每月 1 号更新 ERP）。
+    - cron: "23 12 2 * *"
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "全量回补（首次或数据修复时用）"
+        type: boolean
+        default: false
+      monthly:
+        description: "同时生成上月月度快照"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 判定本次运行类型
+        id: mode
+        run: |
+          FULL=""
+          MONTHLY="no"
+          if [ "${{ github.event.inputs.full }}" = "true" ]; then FULL="--full"; fi
+          if [ "${{ github.event.schedule }}" = "23 12 2 * *" ]; then MONTHLY="yes"; fi
+          if [ "${{ github.event.inputs.monthly }}" = "true" ]; then MONTHLY="yes"; fi
+          echo "full=$FULL"       >> "$GITHUB_OUTPUT"
+          echo "monthly=$MONTHLY" >> "$GITHUB_OUTPUT"
+
+      # 单一数据源挂掉不能拖垮整轮：先尽力抓、尽力提交，最后一步再把失败暴露出来。
+      - name: 抓取六类数据
+        id: fetch
+        continue-on-error: true
+        run: python3 scripts/fetch_all.py ${{ steps.mode.outputs.full }}
+
+      - name: 重建看板与当日快照
+        run: python3 scripts/build_dashboard.py
+
+      - name: 生成上月月度快照
+        if: steps.mode.outputs.monthly == 'yes'
+        run: python3 scripts/monthly_snapshot.py "$(date -u -d 'last month' +%Y-%m)"
+
+      - name: 提交并推送
+        run: |
+          git config user.name  "macro5-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "无变化，跳过提交"
+            exit 0
+          fi
+          STAMP=$(date -u +%Y-%m-%d)
+          SUFFIX=""
+          if [ "${{ steps.mode.outputs.monthly }}" = "yes" ]; then SUFFIX=" + 月度快照"; fi
+          git commit -m "data: $STAMP 日更$SUFFIX"
+          git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+          git push
+
+      - name: 汇报抓取结果
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          rep = json.load(open("data/fetch_report.json", encoding="utf-8"))
+          for j in rep["jobs"]:
+              if j.get("ok"):
+                  print("✅ %s  rows=%s  new=%s  last=%s"
+                        % (j["label"], j["rows"], j["added"], j["last_date"]))
+              else:
+                  print("❌ %s  %s" % (j["label"], j.get("error")))
+          bad = [j["label"] for j in rep["jobs"] if not j.get("ok")]
+          if bad:
+              print("::error::以下数据源抓取失败：" + "、".join(bad))
+              sys.exit(1)
+          PY
