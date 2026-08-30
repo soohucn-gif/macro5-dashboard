@@ -1,5 +1,5 @@
 {
-  "run_at_utc": "2026-08-30T15:03:17",
+  "run_at_utc": "2026-08-30T15:37:47",
   "full": false,
   "jobs": [
     {
@@ -47,7 +47,7 @@
       "label": "隐含股权风险溢价",
       "ok": true,
       "rows": 216,
-      "added": 216,
+      "added": 0,
       "last_date": "2026-08-01"
     }
   ]
