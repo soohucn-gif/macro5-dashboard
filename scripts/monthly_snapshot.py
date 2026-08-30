@@ -67,7 +67,8 @@ def main():
 
     lines = ["# 五大类数据看板 · %s 月度快照" % month, "",
              "生成于 %s（UTC）。日频序列取当月最后一个有效收盘；月频序列取当月官方值。" %
-             datetime.datetime.utcnow().isoformat(timespec="seconds"), "",
+             datetime.datetime.now(datetime.timezone.utc)
+             .isoformat(timespec="seconds"), "",
              "| 指标 | 本月 | 上月 | 环比 | 去年同月 | 同比 | 月内区间 |",
              "|---|---:|---:|---:|---:|---:|---|"]
     cache = {}

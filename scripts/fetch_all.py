@@ -102,7 +102,8 @@ def fetch_bitcoin():
         url = ("https://api.exchange.coinbase.com/products/BTC-USD/candles"
                "?granularity=86400&start=%sT00:00:00Z&end=%sT00:00:00Z" % (cur, end))
         for c in json.loads(http_get(url).decode("utf-8")):
-            d = datetime.datetime.utcfromtimestamp(c[0]).date().isoformat()
+            d = datetime.datetime.fromtimestamp(
+                c[0], datetime.timezone.utc).date().isoformat()
             rows.append({"date": d, "close": round(float(c[4]), 2),
                          "high": round(float(c[2]), 2), "low": round(float(c[1]), 2)})
         cur = end + datetime.timedelta(days=1)
@@ -273,7 +274,8 @@ def main():
             print("[FAIL] %-14s %-22s %s: %s" % (fn.__name__, label, type(e).__name__, e),
                   file=sys.stderr, flush=True)
     with open(os.path.join(DATA, "fetch_report.json"), "w", encoding="utf-8") as f:
-        json.dump({"run_at_utc": datetime.datetime.utcnow().isoformat(timespec="seconds"),
+        json.dump({"run_at_utc": datetime.datetime.now(datetime.timezone.utc)
+                   .isoformat(timespec="seconds"),
                    "full": FULL, "jobs": report}, f, ensure_ascii=False, indent=2)
     if failed:
         print("\n%d/%d 类失败：%s" % (len(failed), len(JOBS), "、".join(failed)),

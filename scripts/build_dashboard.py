@@ -193,7 +193,8 @@ def build():
             (fms[-1]["top_crowded_trade"] if fms else "") + " · 月频", True)
 
     out = {
-        "generated_at": datetime.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "generated_at": datetime.datetime.now(datetime.timezone.utc)
+                        .isoformat(timespec="seconds").replace("+00:00", "Z"),
         "window_start": WINDOW_START,
         "kpis": kpis,
         "panels": {
