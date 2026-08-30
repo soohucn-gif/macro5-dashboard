@@ -222,4 +222,6 @@ if __name__ == "__main__":
     write_summary(d)
     from render_html import render
     render(d)
+    import real_rate_readout
+    real_rate_readout.main()
     print("built: index.html, data/dashboard.json, data/latest.md")
