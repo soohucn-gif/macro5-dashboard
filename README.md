@@ -1,0 +1,78 @@
+# 五大类数据看板
+
+六条序列，每天由 GitHub Actions 自动抓取、落 CSV、重建单文件看板，全部推回本仓库。
+
+**看板：** https://soohucn-gif.github.io/macro5-dashboard/
+
+| # | 模块 | 频率 | 数据源 | 历史起点 |
+|---|---|---|---|---|
+| ① | 10年期实际利率（名义 − 预期通胀） | 日频 | FRED `DFII10` / `DGS10` / `T10YIE` | 2003-01（TIPS）/ 1962（名义） |
+| ② | 隐含股权风险溢价 ERP | 月频 | NYU Stern · Damodaran `ERPbymonth.xlsx` | 2008-09 |
+| ③ | 标普500 / 纳斯达克综合 / 纳斯达克100 | 日频 | FRED `SP500` / `NASDAQCOM` / `NASDAQ100` | 标普 10 年上限；纳指 1971 |
+| ④ | 黄金（伦敦金定盘价） | 日频 | LBMA 官方 JSON | 1968-04 |
+| ⑤ | 比特币 | 日频 | Coinbase Exchange BTC-USD | 2015-07 |
+| ⑥ | GPU 租赁价格指数 | 日频 | Silicon Data SiliconIndex | 2026-08-23（见下） |
+
+## 目录
+
+```
+data/
+  real_rate_10y.csv    date, dfii10, dgs10, t10yie, implied_real
+  erp_monthly.csv      date, erp_t12m, tbond_rate, expected_return, sp500, ...
+  equity_indices.csv   date, sp500, nasdaq_comp, nasdaq_100
+  gold.csv             date, usd_per_oz
+  bitcoin.csv          date, close, high, low
+  gpu_rental.csv       date, gpu, segment, usd_per_hr
+  dashboard.json       看板内联的十年窗口数据
+  latest.md            当日文本快照（覆盖写）
+  daily/YYYY-MM-DD.md  当日文本快照存档
+  monthly/YYYY-MM.md   月度文本快照（环比 / 同比 / 月内区间）
+  fetch_report.json    上一轮各源成败与增量行数
+index.html             自包含单文件看板（无外部依赖）
+scripts/               抓取与构建脚本，纯标准库，无需 pip install
+```
+
+## 几处必须说明的口径
+
+**① 实际利率。** `DFII10` 是 10 年期 TIPS 收益率，市场对「名义 − 预期通胀」这个差值的
+直接定价。同表另存 `DGS10`（名义）与 `T10YIE`（10 年盈亏平衡通胀），并算出
+`implied_real = DGS10 − T10YIE` 作交叉验算 —— 两者通常完全一致或差 1bp。
+
+**② ERP 的日期约定。** Damodaran 表中标记为 `YYYY-MM-01` 的那一行，用的是**上月最后一个
+交易日**的指数点位反解出来的。所以 `2026-08-01` 这一行描述的是 7 月底的市场状态。
+这是原始数据的口径，本仓库不改写。
+
+原始工作簿用的是 **1904 日期系统**，序列号必须以 1904-01-01 为原点；另有个别月份
+（如 2024-09）日期被存成文本 `1-Sep-24`。两种情况脚本都已处理。
+
+**③ 标普历史长度。** FRED 的 `SP500` 序列按授权只保留最近 10 年，因此本仓库标普
+最早只能到 10 年前；纳指两条序列没有这个限制。
+
+**⑥ GPU 指数没有 10 年历史。** Silicon Data 2025 年才发布该指数，且公开层只吐出
+**滚动 7 天**窗口（付费 API 才有全历史）。因此这一类无法回补 —— 本仓库自
+2026-08-23 起每日抓取累积，历史在仓库里逐日生长。H100 与 A100 同时公开
+Neo-Cloud 与超大规模云两档，H200 / B200 / MI300X 只公开 Neo-Cloud 一档。
+
+## 运行
+
+```bash
+python3 scripts/fetch_all.py            # 增量
+python3 scripts/fetch_all.py --full     # 全量回补
+python3 scripts/build_dashboard.py      # 重建 index.html + dashboard.json + latest.md
+python3 scripts/monthly_snapshot.py 2026-08
+```
+
+无第三方依赖，Python 3.8+ 即可。
+
+## 自动化
+
+`.github/workflows/update.yml`
+
+- 每日 23:37 UTC（北京 07:37 次日）：抓六类 → 重建看板 → 提交推送
+- 每月 2 号 12:23 UTC：额外生成上月月度快照
+- 也可在 Actions 页手动触发，勾选「全量回补」或「月度快照」
+
+单一数据源失败不会中断整轮：能抓到的照常落库提交，最后一步再把失败源标红，
+GitHub 会就失败的 workflow 发通知。
+
+数据仅供研究，不构成投资建议。
