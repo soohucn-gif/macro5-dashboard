@@ -1,0 +1,36 @@
+month,rank,trade,trade_cn,pct
+2025-10,1,Long gold,做多黄金,43
+2025-10,2,Long Magnificent 7,做多美股七巨头,39
+2025-10,3,Short US dollar,做空美元,8
+2025-11,1,Long Magnificent 7,做多美股七巨头,54
+2025-11,2,Long gold,做多黄金,28
+2025-11,3,Short US dollar,做空美元,
+2025-12,1,Long Magnificent 7,做多美股七巨头,54
+2025-12,2,Long gold,做多黄金,29
+2025-12,3,Short US dollar,做空美元,
+2026-01,1,Long gold,做多黄金,51
+2026-01,2,Long Magnificent 7,做多美股七巨头,27
+2026-01,3,Short US dollar,做空美元,
+2026-02,1,Long gold,做多黄金,50
+2026-02,2,Long Magnificent 7,做多美股七巨头,20
+2026-02,3,Short US dollar,做空美元,
+2026-03,1,Long gold,做多黄金,35
+2026-03,2,Long global semiconductors,做多全球半导体,35
+2026-03,3,Long Magnificent 7,做多美股七巨头,9
+2026-04,1,Long oil,做多原油,24
+2026-04,2,Long global semiconductors,做多全球半导体,24
+2026-05,1,Long global semiconductors,做多全球半导体,73
+2026-05,2,Long Magnificent 7,做多美股七巨头,14
+2026-05,3,Long oil,做多原油,6
+2026-06,1,Long global semiconductors,做多全球半导体,80
+2026-06,2,Long Magnificent 7,做多美股七巨头,12
+2026-06,3,Long oil,做多原油,4
+2026-07,1,Long global semiconductors,做多全球半导体,82
+2026-07,2,Long Magnificent 7,做多美股七巨头,7
+2026-07,3,Long US dollar,做多美元,4
+2026-08,1,Long global semiconductors,做多全球半导体,53
+2026-08,2,Short Japanese yen,做空日元,12
+2026-08,3,Long Magnificent 7,做多美股七巨头,11
+2026-08,4,Long global banks,做多全球银行股,7
+2026-08,5,Short Treasuries,做空美债,6
+2026-08,6,Long EM carry trades,做多新兴市场套息交易,5

@@ -82,6 +82,21 @@ svg{display:block;width:100%;height:auto;touch-action:pan-y}
 .tip .t-date{color:var(--muted);margin-bottom:5px;font-size:11px}
 .tip .t-row{display:flex;justify-content:space-between;gap:14px}
 .tip .t-row b{font-weight:600}
+.xsec{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+  margin:16px 0 4px;padding-top:14px;border-top:1px solid var(--line)}
+.xsec h3{font-size:12.5px;margin:0 0 2px;font-weight:600}
+.xsec .xnote{font-size:11px;color:var(--muted);margin:0 0 8px;line-height:1.45}
+.xrow{margin-bottom:7px;font-size:12px}
+.xhead{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.xhead b{font-weight:500}
+.xhead i{font-style:normal;color:var(--muted);font-variant-numeric:tabular-nums;
+  font-size:11.5px;flex-shrink:0}
+.xen{color:var(--muted);font-size:10.5px;display:block;margin-top:1px}
+.xbar{height:4px;border-radius:2px;background:var(--chip);margin-top:4px;overflow:hidden}
+.xbar span{display:block;height:100%;border-radius:2px;background:var(--c1)}
+.xsec .xrow:first-child .xbar span{background:var(--c2)}
+.xmonth{display:inline-block;background:var(--chip);border-radius:5px;padding:1px 7px;
+  font-size:11px;color:var(--muted);margin-left:8px;font-variant-numeric:tabular-nums}
 .src{font-size:11.5px;color:var(--muted);margin-top:8px;
   border-top:1px solid var(--line);padding-top:8px;
   display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between}
@@ -118,6 +133,10 @@ footer ul{padding-left:18px;margin:8px 0}
     <li>比特币 — Coinbase Exchange BTC-USD 日线收盘。</li>
     <li>GPU 租赁价格指数 — Silicon Data SiliconIndex；公开层仅提供滚动 7 天窗口，
         本仓库每日抓取累积。</li>
+    <li>美银基金经理调查 — BofA Global Fund Manager Survey，每月中旬发布。本仓库只收录
+        <b>派生的数字口径</b>（现金水位、拥挤交易与尾部风险的排名占比、官方 Contrarian
+        Trades 标签），<b>不转载 BofA 原始图表与报告正文</b>，其版权归 BofA Global
+        Research 所有。数据由本机私有存档按月同步。</li>
   </ul>
   <div>完整历史 CSV 见仓库 <code>data/</code> 目录。本页由 GitHub Actions 每日自动重建，
   不构成投资建议。</div>
@@ -309,6 +328,7 @@ Object.keys(D.panels).forEach(function(key){
   card.innerHTML='<div class="card-top"><div><h2>'+p.title+'</h2>'
     +'<p class="desc">'+p.sub+'</p></div><div class="ranges"></div></div>'
     +'<div class="legend"></div><div class="chartbox"></div>'
+    +'<div class="xsec"></div>'
     +'<div class="src"><span>来源：'+p.source+'</span><span>'+p.freq
     +' · 单位：'+p.unit+' · '+p.data.dates[0]+' → '
     +p.data.dates[p.data.dates.length-1]+'（'+p.data.dates.length+' 点）</span></div>';
@@ -338,6 +358,26 @@ Object.keys(D.panels).forEach(function(key){
       b.setAttribute("aria-pressed", ch.isHidden(l)?"false":"true"); };
     lg.appendChild(b);
   });
+  var xs=card.querySelector(".xsec");
+  if(p.tables && p.tables.length){
+    card.querySelector("h2").insertAdjacentHTML("beforeend",
+      '<span class="xmonth">当期截面 '+(p.month||"")+'</span>');
+    xs.innerHTML = p.tables.map(function(t){
+      var mx = Math.max.apply(null, t.items.map(function(i){
+        return Math.abs(i.pct||0);}).concat([1]));
+      return '<div><h3>'+t.title+'</h3><p class="xnote">'+t.note+'</p>'
+        + t.items.map(function(i){
+            var pctTxt = (i.pct===null||i.pct===undefined) ? "" : '<i>'+i.pct+'%</i>';
+            var bar = (i.pct===null||i.pct===undefined) ? ""
+              : '<div class="xbar"><span style="width:'+(Math.abs(i.pct)/mx*100).toFixed(1)
+                +'%'+(i.pct<0?';background:var(--c5)':'')+'"></span></div>';
+            var en = i.en ? '<span class="xen">'+i.en+'</span>' : "";
+            return '<div class="xrow"><div class="xhead"><b>'+i.label+'</b>'+pctTxt+'</div>'
+                 + en + bar + '</div>';
+          }).join("")
+        + '</div>';
+    }).join("");
+  } else { xs.remove(); }
   ch.draw(); charts.push(ch);
 });
 addEventListener("resize", function(){ charts.forEach(function(c){c.draw();}); });

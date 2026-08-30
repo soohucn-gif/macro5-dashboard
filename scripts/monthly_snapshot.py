@@ -115,6 +115,48 @@ def main():
             lines.append("| %s · %s | %.2f | %.2f | %.2f |"
                          % (gpu_name, seg, pts[-1][1], min(vals), max(vals)))
 
+    # 美银 FMS（月频，本机同步）
+    fms = read_csv(os.path.join(DATA, "bofa_fms.csv"))
+    fms_cur = next((r for r in fms if r["month"] == month), None)
+    if fms_cur:
+        prev_row = next((r for r in fms if r["month"] == prev), None)
+
+        def d(k, unit="pp"):
+            try:
+                a, b = float(fms_cur[k]), float(prev_row[k])
+            except (TypeError, ValueError, KeyError):
+                return "—"
+            return "%+.1f %s" % (a - b, unit)
+        lines += ["", "## 美银基金经理调查（%s 期）" % month, "",
+                  "| 指标 | 本期 | 环比 |", "|---|---:|---:|",
+                  "| 现金水位 | %s%% | %s |" % (fms_cur["cash_pct"], d("cash_pct")),
+                  "| Cash Rule 信号 | %s | — |" % fms_cur["cash_rule_signal"],
+                  "| 头号拥挤交易 | %s（%s%%） | %s |"
+                  % (fms_cur["top_crowded_trade"], fms_cur["top_crowded_pct"], d("top_crowded_pct")),
+                  "| 头号尾部风险 | %s（%s%%） | %s |"
+                  % (fms_cur["top_tail_risk"], fms_cur["top_tail_risk_pct"], d("top_tail_risk_pct")),
+                  "| 股票净超配 | %s%% | %s |"
+                  % (fms_cur["net_ow_equities"] or "—", d("net_ow_equities"))]
+        crowded = [r for r in read_csv(os.path.join(DATA, "bofa_fms_crowded.csv"))
+                   if r["month"] == month]
+        contra = [r for r in read_csv(os.path.join(DATA, "bofa_fms_contrarian.csv"))
+                  if r["month"] == month]
+        if crowded:
+            lines += ["", "**最拥挤交易**：" + "；".join(
+                "%s %s%%" % (r["trade_cn"] or r["trade"], r["pct"]) for r in crowded)]
+        tails = [r for r in contra if r["kind"] == "tail_risk"]
+        if tails:
+            lines += ["", "**尾部风险**：" + "；".join(
+                "%s %s%%" % (r["item_cn"] or r["item"], r["pct"]) for r in tails)]
+        cts = [r for r in contra if r["kind"] == "contrarian"]
+        if cts:
+            lines += ["", "**BofA 官方反向交易**：" + "；".join(r["item"] for r in cts)]
+        uw = [r for r in contra if r["kind"] == "most_underweight"]
+        if uw:
+            lines += ["", "**最被低配**：" + "、".join(r["item"] for r in uw)]
+        lines += ["", "> FMS 仅收录派生数字口径，原始图表与报告正文版权归 "
+                      "BofA Global Research，不在本仓库分发。"]
+
     rep_path = os.path.join(DATA, "fetch_report.json")
     if os.path.exists(rep_path):
         rep = json.load(open(rep_path, encoding="utf-8"))

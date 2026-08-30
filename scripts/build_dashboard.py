@@ -71,6 +71,9 @@ def build():
     btc = read_csv(os.path.join(DATA, "bitcoin.csv"))
     erp = read_csv(os.path.join(DATA, "erp_monthly.csv"))
     gpu_rows = read_csv(os.path.join(DATA, "gpu_rental.csv"))
+    fms = read_csv(os.path.join(DATA, "bofa_fms.csv"))
+    fms_crowded = read_csv(os.path.join(DATA, "bofa_fms_crowded.csv"))
+    fms_contra = read_csv(os.path.join(DATA, "bofa_fms_contrarian.csv"))
 
     p_rr = panel(rr, {"dfii10": "10年期实际利率 (TIPS)", "dgs10": "10年期名义利率",
                       "t10yie": "10年期盈亏平衡通胀"})
@@ -90,6 +93,54 @@ def build():
     for gpu, seg in keys:
         label = "%s · %s" % (gpu, seg_cn.get(seg, seg))
         p_gpu["series"][label] = [lookup.get((d, gpu, seg)) for d in gdates]
+
+    # 美银 FMS：月频，month 列补成月初日期以复用同一套图表逻辑
+    fms_rows = [dict(r, date=r["month"] + "-01") for r in fms]
+    p_fms = panel(fms_rows, {"cash_pct": "现金水位 %",
+                             "top_crowded_pct": "头号拥挤交易 拥挤度 %",
+                             "top_tail_risk_pct": "头号尾部风险 占比 %",
+                             "sentiment_score": "情绪分 (0-10)"}, date_from="1900-01-01")
+
+    def fms_list(rows, pred, limit=8):
+        items = sorted([r for r in rows if pred(r)], key=lambda r: int(r["rank"]))[:limit]
+        out = []
+        for r in items:
+            label = r.get("trade_cn") or r.get("item_cn") or r.get("trade") or r.get("item")
+            en = r.get("trade") or r.get("item") or ""
+            pv = f(r.get("pct"))
+            out.append({"label": label, "en": en if en != label else "",
+                        "pct": None if pv is None else round(pv, 1)})
+        return out
+
+    fms_month = fms[-1]["month"] if fms else None
+    # 本类由本机按月同步（云端读不到私有存档），超期就在面板上讲明白，别让人误读成最新
+    fms_stale = ""
+    if fms_month:
+        age = (TODAY - datetime.date.fromisoformat(fms_month + "-01")).days
+        if age > 45:
+            fms_stale = ("　⚠️ 最新一期为 %s，距今 %d 天，本机月度同步可能没跑成。"
+                         % (fms_month, age))
+    else:
+        fms_stale = "　⚠️ 尚未同步到任何一期数据。"
+    fms_tables = []
+    if fms_month:
+        fms_tables = [
+            {"title": "最拥挤交易", "note": "「你认为当前最拥挤的交易是什么」的答案占比",
+             "items": fms_list(fms_crowded, lambda r: r["month"] == fms_month)},
+            {"title": "最大尾部风险", "note": "受访者票选的头号风险",
+             "items": fms_list(fms_contra,
+                               lambda r: r["month"] == fms_month and r["kind"] == "tail_risk")},
+            {"title": "官方反向交易", "note": "BofA 每期 Bottom Line 给出的 Contrarian Trades",
+             "items": fms_list(fms_contra,
+                               lambda r: r["month"] == fms_month and r["kind"] == "contrarian")},
+            {"title": "最被低配 · 资产与地区", "note": "基金经理躲得最远的大类与市场",
+             "items": fms_list(fms_contra, lambda r: r["month"] == fms_month
+                               and r["kind"] == "most_underweight")},
+            {"title": "最被低配 · 行业", "note": "行业净超配百分比，负值即净低配",
+             "items": fms_list(fms_contra, lambda r: r["month"] == fms_month
+                               and r["kind"] == "sector_underweight")},
+        ]
+        fms_tables = [t for t in fms_tables if t["items"]]
 
     # 跨资产归一：十年窗口内各自首个有效值 = 100
     def rebase(p, label, out_label):
@@ -137,6 +188,9 @@ def build():
     for lab in sorted(p_gpu["series"]):
         if lab.startswith("H100") or lab.startswith("B200"):
             add_kpi("GPU " + lab, "美元/小时", p_gpu, lab, "Silicon Data · 日频", True)
+    add_kpi("FMS 现金水位", "%", p_fms, "现金水位 %", "美银基金经理调查 · 月频", True)
+    add_kpi("FMS 头号拥挤交易", "%", p_fms, "头号拥挤交易 拥挤度 %",
+            (fms[-1]["top_crowded_trade"] if fms else "") + " · 月频", True)
 
     out = {
         "generated_at": datetime.datetime.utcnow().isoformat(timespec="seconds") + "Z",
@@ -167,7 +221,15 @@ def build():
                            "本仓库每日抓取累积，历史自 2026-08-23 起在此逐日生长。",
                     "unit": "美元/小时", "freq": "日频",
                     "source": "Silicon Data · SiliconIndex", "data": p_gpu},
-            "normalized": {"title": "⑦ 跨资产归一对比",
+            "fms": {"title": "⑧ 美银基金经理调查：拥挤交易与反向交易",
+                    "sub": "BofA Global FMS 月度问卷。现金水位是老牌反向指标"
+                           "（<4.0% 触发 sell signal）；拥挤度看的是共识有多挤，"
+                           "反向交易看的是没人站的那一边。" + fms_stale,
+                    "unit": "%", "freq": "月频", "month": fms_month,
+                    "tables": fms_tables,
+                    "source": "BofA Global Fund Manager Survey（派生数字口径，不含原图）",
+                    "data": p_fms},
+            "normalized": {"title": "⑨ 跨资产归一对比",
                            "sub": "所选区间的起点 = 100，对数坐标；切换区间基期会跟着走。"
                                   "看的是相对赔率，不是绝对价格。",
                            "unit": "指数 (区间起点=100)", "freq": "日频", "log": True,

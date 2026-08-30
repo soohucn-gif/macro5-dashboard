@@ -1,0 +1,12 @@
+month,release_date,cash_pct,cash_rule_signal,sentiment_score,net_ow_equities,net_ow_us_equities,n_managers,aum_usd_bn,top_crowded_trade,top_crowded_pct,top_tail_risk,top_tail_risk_pct
+2025-10,,3.8,sell,,,,,,Long gold,43,AI equity bubble,33
+2025-11,,3.7,sell,,,,,,Long Magnificent 7,54,AI bubble,45
+2025-12,,3.3,sell,,,,,,Long Magnificent 7,54,AI bubble,38
+2026-01,,3.2,sell,,,,,,Long gold,51,Geopolitical conflict,28
+2026-02,,3.4,sell,,,,,,Long gold,50,AI bubble,25
+2026-03,,4.3,neutral,,,,,,Long gold,35,Geopolitical conflict,37
+2026-04,,4.3,neutral,,,,,,Long oil,24,Geopolitical conflict,44
+2026-05,,3.9,sell,,,,,,Long global semiconductors,73,Inflation,40
+2026-06,,4.1,neutral,,,,,,Long global semiconductors,80,2nd wave of inflation,34
+2026-07,,3.6,sell,,,,,,Long global semiconductors,82,AI bubble,45
+2026-08,2026-08-18,3.5,sell,8.5,56,27,180,525,Long global semiconductors,53,AI bubble,32

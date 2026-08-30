@@ -12,6 +12,7 @@
 | ④ | 黄金（伦敦金定盘价） | 日频 | LBMA 官方 JSON | 1968-04 |
 | ⑤ | 比特币 | 日频 | Coinbase Exchange BTC-USD | 2015-07 |
 | ⑥ | GPU 租赁价格指数 | 日频 | Silicon Data SiliconIndex | 2026-08-23（见下） |
+| ⑦ | 美银基金经理调查：拥挤交易与反向交易 | 月频 | BofA Global FMS（派生口径，见下） | 2025-10 |
 
 ## 目录
 
@@ -23,6 +24,9 @@ data/
   gold.csv             date, usd_per_oz
   bitcoin.csv          date, close, high, low
   gpu_rental.csv       date, gpu, segment, usd_per_hr
+  bofa_fms.csv             month, cash_pct, sentiment_score, top_crowded_trade, ...
+  bofa_fms_crowded.csv     month, rank, trade, trade_cn, pct
+  bofa_fms_contrarian.csv  month, kind, rank, item, item_cn, pct
   dashboard.json       看板内联的十年窗口数据
   latest.md            当日文本快照（覆盖写）
   daily/YYYY-MM-DD.md  当日文本快照存档
@@ -53,6 +57,19 @@ scripts/               抓取与构建脚本，纯标准库，无需 pip install
 2026-08-23 起每日抓取累积，历史在仓库里逐日生长。H100 与 A100 同时公开
 Neo-Cloud 与超大规模云两档，H200 / B200 / MI300X 只公开 Neo-Cloud 一档。
 
+**⑦ 美银 FMS 只收派生数字，不搬原始材料。** BofA Global Fund Manager Survey 的完整报告与
+图表版权归 BofA Global Research，原始存档在私有仓库 `soohucn-gif/bofa-fms`（含原图与报告
+正文），**不对外分发**。本公开仓库只收录三类派生数字：月度头条指标（现金水位、情绪分、
+净超配）、最拥挤交易与尾部风险的排名及占比、BofA 官方 Contrarian Trades 的文字标签 ——
+即各家通讯社每月公开报道的那几个数。**不含任何 BofA 图表或报告正文。**
+
+口径提醒：BofA 问卷**只问「最拥挤交易」，没有对称的「最冷门交易」**。看板里的"冷门"分三层：
+官方 Contrarian Trades（最接近官方口径）、绝对仓位里净超配最低的品类、行业情绪里净超配为负的行业。
+
+同步链路：云端 Actions **读不到**本机私有存档，所以这一类由**本机**的
+`bofa-fms-monthly` 定时任务在每期发布后跑 `scripts/sync_bofa_fms.py` 生成 CSV 并推送；
+云端日更只是把已提交的 CSV 读进看板。若超过 45 天没有新一期，看板面板会自己标出来。
+
 ## 运行
 
 ```bash
@@ -60,6 +77,7 @@ python3 scripts/fetch_all.py            # 增量
 python3 scripts/fetch_all.py --full     # 全量回补
 python3 scripts/build_dashboard.py      # 重建 index.html + dashboard.json + latest.md
 python3 scripts/monthly_snapshot.py 2026-08
+python3 scripts/sync_bofa_fms.py            # 仅本机：从 ../bofa-fms 同步派生数字
 ```
 
 无第三方依赖，Python 3.8+ 即可。

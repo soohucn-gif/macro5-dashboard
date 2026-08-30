@@ -1,0 +1,98 @@
+month,kind,rank,item,item_cn,pct
+2025-10,tail_risk,1,AI equity bubble,AI 股票泡沫,33
+2025-10,tail_risk,2,2nd wave of inflation,第二波通胀,27
+2025-10,tail_risk,3,Fed loses independence / US dollar debasement,美联储丧失独立性/美元贬值,14
+2025-10,contrarian,1,long bonds - short stocks,,
+2025-10,contrarian,2,long UK - short EM,,
+2025-10,contrarian,3,long staples - short banks,,
+2025-10,contrarian,4,long energy - short industrials,,
+2025-10,most_underweight,1,Cash,,
+2025-10,most_underweight,2,Staples,,
+2025-11,tail_risk,1,AI bubble,AI 泡沫,45
+2025-11,tail_risk,2,Disorderly rise in bond yields,债券收益率无序上行,17
+2025-11,tail_risk,3,Inflation,通胀,16
+2025-12,tail_risk,1,AI bubble,AI 泡沫,38
+2025-12,tail_risk,2,Disorderly rise in bond yields,债券收益率无序上行,19
+2025-12,tail_risk,3,Inflation,通胀,17
+2025-12,contrarian,1,long cash & bonds - short stocks & commodities,,
+2025-12,contrarian,2,long UK stocks - short EM stocks,,
+2025-12,contrarian,3,long energy & staples - short tech & banks,,
+2025-12,most_underweight,1,Bonds,,
+2025-12,most_underweight,2,Cash,,
+2025-12,most_underweight,3,Staples,,
+2025-12,most_underweight,4,Energy,,
+2026-01,tail_risk,1,Geopolitical conflict,地缘冲突,28
+2026-01,tail_risk,2,AI bubble,AI 泡沫,27
+2026-01,tail_risk,3,Disorderly rise in bond yields,债券收益率无序上行,19
+2026-01,contrarian,1,long cash/bonds - short commodities/stocks,,
+2026-01,contrarian,2,long IG - short HY bonds,,
+2026-01,contrarian,3,long staples - short banks,,
+2026-01,contrarian,4,long energy - short pharma,,
+2026-01,contrarian,5,long UK stocks - short EM,,
+2026-01,most_underweight,1,Bonds,,
+2026-01,most_underweight,2,Staples,,
+2026-02,tail_risk,1,AI bubble,AI 泡沫,25
+2026-02,tail_risk,2,Inflation,通胀,20
+2026-02,tail_risk,3,Disorderly rise in bond yields,债券收益率无序上行,17
+2026-02,contrarian,1,long bonds - short gold,,
+2026-02,contrarian,2,long US$ - short EM,,
+2026-02,contrarian,3,long tech - short banks,,
+2026-02,contrarian,4,long REITs - short materials,,
+2026-02,most_underweight,1,Bonds,,
+2026-03,tail_risk,1,Geopolitical conflict,地缘冲突,37
+2026-03,tail_risk,2,Inflation,通胀,23
+2026-03,tail_risk,3,Private credit,私募信贷,16
+2026-03,contrarian,1,long bonds - short commodities,,
+2026-03,contrarian,2,long UK - short EM,,
+2026-03,contrarian,3,long consumer - short industrials,,
+2026-03,most_underweight,1,Consumer discretionary,,
+2026-04,tail_risk,1,Geopolitical conflict,地缘冲突,44
+2026-04,tail_risk,2,Inflation,通胀,26
+2026-04,tail_risk,3,Disorderly rise in bond yields,债券收益率无序上行,9
+2026-04,tail_risk,4,Private credit,私募信贷,8
+2026-04,tail_risk,5,AI bubble,AI 泡沫,5
+2026-04,contrarian,1,"bullish: bonds, consumer discretionary, REITs, Japan",,
+2026-04,contrarian,2,"bearish: commodities, materials, EM stocks",,
+2026-04,most_underweight,1,Japan,,
+2026-04,most_underweight,2,EU stocks,,
+2026-04,most_underweight,3,Global banks,,
+2026-05,tail_risk,1,Inflation,通胀,40
+2026-05,contrarian,1,"covering shorts: bonds, US dollar, UK assets, consumer stocks",,
+2026-05,contrarian,2,"paring length: commodities, stocks, EM assets, tech/semis",,
+2026-05,most_underweight,1,Bonds,,
+2026-05,most_underweight,2,Eurozone,,
+2026-05,most_underweight,3,Consumer,,
+2026-06,tail_risk,1,2nd wave of inflation,第二波通胀,34
+2026-06,tail_risk,2,AI bubble,AI 泡沫,28
+2026-06,tail_risk,3,Disorderly rise in bond yields,债券收益率无序上行,19
+2026-06,contrarian,1,"long bonds, Europe, consumer, REITs",,
+2026-06,contrarian,2,"short commodities, semis, materials, banks",,
+2026-06,most_underweight,1,Europe,,
+2026-06,most_underweight,2,US dollar,,
+2026-07,tail_risk,1,AI bubble,AI 泡沫,45
+2026-07,tail_risk,2,2nd wave of inflation,第二波通胀,26
+2026-07,tail_risk,3,Disorderly rise in bond yields,债券收益率无序上行,14
+2026-07,contrarian,1,long staples & gold - short semis & healthcare,,
+2026-07,contrarian,2,"long bonds, UK & high dividend yielders - short industrials & banks",,
+2026-07,most_underweight,1,UK,,
+2026-07,most_underweight,2,Staples,,
+2026-08,tail_risk,1,AI bubble,AI 泡沫,32
+2026-08,tail_risk,2,Disorderly rise in bond yields,债券收益率无序上行,27
+2026-08,tail_risk,3,2nd wave of inflation,第二波通胀,25
+2026-08,tail_risk,4,Geopolitical conflict,地缘冲突,6
+2026-08,tail_risk,5,DEM sweep in US midterms,民主党横扫中期选举,5
+2026-08,tail_risk,6,US dollar debasement,美元贬值失序,3
+2026-08,contrarian,1,long bonds / short commodities,,
+2026-08,contrarian,2,long staples / short tech,,
+2026-08,contrarian,3,long discretionary / short banks,,
+2026-08,contrarian,4,long UK stocks / short US stocks,,
+2026-08,most_underweight,1,Bonds,,
+2026-08,most_underweight,2,UK,,
+2026-08,most_underweight,3,Staples,,
+2026-08,most_underweight,4,Discretionary,,
+2026-08,most_underweight,5,GBP,,
+2026-08,most_underweight,6,Insurance,,
+2026-08,most_underweight,7,REITs,,
+2026-08,sector_underweight,1,Staples,,-19
+2026-08,sector_underweight,2,Discretionary,,-12
+2026-08,sector_underweight,3,Insurance,,-10
