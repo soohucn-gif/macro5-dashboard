@@ -1,12 +1,12 @@
-month,release_date,cash_pct,cash_rule_signal,sentiment_score,net_ow_equities,net_ow_us_equities,n_managers,aum_usd_bn,top_crowded_trade,top_crowded_pct,top_tail_risk,top_tail_risk_pct
-2025-10,,3.8,sell,,,,,,Long gold,43,AI equity bubble,33
-2025-11,,3.7,sell,,,,,,Long Magnificent 7,54,AI bubble,45
-2025-12,,3.3,sell,,,,,,Long Magnificent 7,54,AI bubble,38
-2026-01,,3.2,sell,,,,,,Long gold,51,Geopolitical conflict,28
-2026-02,,3.4,sell,,,,,,Long gold,50,AI bubble,25
-2026-03,,4.3,neutral,,,,,,Long gold,35,Geopolitical conflict,37
-2026-04,,4.3,neutral,,,,,,Long oil,24,Geopolitical conflict,44
-2026-05,,3.9,sell,,,,,,Long global semiconductors,73,Inflation,40
-2026-06,,4.1,neutral,,,,,,Long global semiconductors,80,2nd wave of inflation,34
-2026-07,,3.6,sell,,,,,,Long global semiconductors,82,AI bubble,45
-2026-08,2026-08-18,3.5,sell,8.5,56,27,180,525,Long global semiconductors,53,AI bubble,32
+month,release_date,cash_pct,cash_rule_signal,sentiment_score,net_ow_equities,net_ow_us_equities,n_managers,aum_usd_bn,top_crowded_trade,top_crowded_pct,top_tail_risk,top_tail_risk_pct,confidence,sources,notes
+2025-10,,3.8,sell,,,,,,Long gold,43,AI equity bubble,33,high,私有存档 soohucn-gif/bofa-fms（BofA 原图逐张读取）,【回补期次·核心字段】本期在 Mace News 检索页中已不可达（该站仅保留最近约 10 篇 FMS 通稿），数据取自 BofA 首页 Bottom Line 摘要图，并由 2025-11 通稿中的『上月』栏交叉校验（黄金 43% / 七巨头 39% / 做空美元 8%；AI 泡沫 33%）。 未做逐图深挖，行业净超配/月度轮动/宏观净比例等字段留空。现金 3.8%；情绪为 2025 年 2 月
+2025-11,,3.7,sell,,,,,,Long Magnificent 7,54,AI bubble,45,high,私有存档 soohucn-gif/bofa-fms（BofA 原图逐张读取）,【回补期次·核心字段】来源为 BofA 首页 Bottom Line 摘要图 + Mace News 通稿交叉校验；未做逐图深挖，行业净超配/月度轮动/宏观净比例等字段留空。转载方未提供 Bottom Line 摘要页，本期仅有通稿口径；反向交易清单缺失。现金 3.7%(10 月 3.8%、9 月 3.9%)。
+2025-12,,3.3,sell,,,,,,Long Magnificent 7,54,AI bubble,38,high,私有存档 soohucn-gif/bofa-fms（BofA 原图逐张读取）,【回补期次·核心字段】来源为 BofA 首页 Bottom Line 摘要图 + Mace News 通稿交叉校验；未做逐图深挖，行业净超配/月度轮动/宏观净比例等字段留空。现金 3.3% 创历史新低；Bull & Bear 指标升至 7.9，逼近卖出信号；软着陆 57%、不着陆 37%、硬着陆 3%(历史最低)。摘要图给的尾部风险 AI 泡沫为 37%，通稿为 38%，此处采用通稿。
+2026-01,,3.2,sell,,,,,,Long gold,51,Geopolitical conflict,28,high,私有存档 soohucn-gif/bofa-fms（BofA 原图逐张读取）,【回补期次·核心字段】本期无自身 Mace 通稿，数据取自 BofA 首页 Bottom Line 摘要图，并由 2026-02 通稿中的『上月』栏交叉校验（黄金 51% / 七巨头 27%；地缘冲突 28% / AI 泡沫 27% / 债券收益率 19%）。 未做逐图深挖，行业净超配/月度轮动/宏观净比例等字段留空。现金 3.2% 创历史新低；Bull & Bear 指标 9.4 超级看多；20
+2026-02,,3.4,sell,,,,,,Long gold,50,AI bubble,25,high,私有存档 soohucn-gif/bofa-fms（BofA 原图逐张读取）,【回补期次·核心字段】来源为 BofA 首页 Bottom Line 摘要图 + Mace News 通稿交叉校验；未做逐图深挖，行业净超配/月度轮动/宏观净比例等字段留空。Bull & Bear 指标 9.5，自 2025 年 12 月 17 日起触发反向卖出信号；资金由美股轮动至新兴市场与欧洲、由科技轮动至能源与材料。样本 190 人 / 5120 亿美元(= $512 billion)。
+2026-03,,4.3,neutral,,,,,,Long gold,35,Geopolitical conflict,37,high,私有存档 soohucn-gif/bofa-fms（BofA 原图逐张读取）,【回补期次·核心字段】来源为 BofA 首页 Bottom Line 摘要图 + Mace News 通稿交叉校验；未做逐图深挖，行业净超配/月度轮动/宏观净比例等字段留空。伊朗局势与私募信贷担忧终结此前的亢奋情绪；现金由 3.4% 跳升至 4.3%，为 2020 年 3 月以来最大单月升幅，Cash Rule 卖出信号解除。摘要页 Bottom Line 写作 4.2%，但同页 Table 1 
+2026-04,,4.3,neutral,,,,,,Long oil,24,Geopolitical conflict,44,high,私有存档 soohucn-gif/bofa-fms（BofA 原图逐张读取）,【回补期次·核心字段】来源为 BofA 首页 Bottom Line 摘要图 + Mace News 通稿交叉校验；未做逐图深挖，行业净超配/月度轮动/宏观净比例等字段留空。2025 年 6 月以来最悲观的一期；增长预期跌至 -36%，通胀预期升至 69%；地缘冲突连续第 2 个月居首且升至 44%。本期无 Mace 通稿，尾部风险取自 Chart 12 原图。
+2026-05,,3.9,sell,,,,,,Long global semiconductors,73,Inflation,40,high,私有存档 soohucn-gif/bofa-fms（BofA 原图逐张读取）,【回补期次·核心字段】来源为 BofA 首页 Bottom Line 摘要图 + Mace News 通稿交叉校验；未做逐图深挖，行业净超配/月度轮动/宏观净比例等字段留空。股票配置创单月历史最大升幅；现金由 4.3% 降至 3.9%；Bull & Bear 7.8，逼近卖出信号。本期无 Mace 通稿，数据取自 Bottom Line 摘要页并由 2026-06 通稿的上月栏交叉校验。
+2026-06,,4.1,neutral,,,,,,Long global semiconductors,80,2nd wave of inflation,34,high,私有存档 soohucn-gif/bofa-fms（BofA 原图逐张读取）,【回补期次·核心字段】来源为 BofA 首页 Bottom Line 摘要图 + Mace News 通稿交叉校验；未做逐图深挖，行业净超配/月度轮动/宏观净比例等字段留空。半导体拥挤度 80%，创当时 FMS 历史新高；股票净超配由 50% 降至 38%，科技由 33% 降至 26%；Bull & Bear 8.9 触发卖出信号。样本 198 人 / 5400 亿美元(= $540 billio
+2026-07,,3.6,sell,,,,,,Long global semiconductors,82,AI bubble,45,high,私有存档 soohucn-gif/bofa-fms（BofA 原图逐张读取）,【回补期次·核心字段】来源为 BofA 首页 Bottom Line 摘要图 + Mace News 通稿交叉校验；未做逐图深挖，行业净超配/月度轮动/宏观净比例等字段留空。半导体拥挤度 82%，创 FMS 有史以来单一交易最高共识度记录；现金由 4.1% 降至 3.6%；Bull & Bear 9.4 极端看多。样本 210 人 / 5550 亿美元(= $555 billion)。
+2026-08,2026-08-18,3.5,sell,8.5,56,27,180,525,Long global semiconductors,53,AI bubble,32,high,私有存档 soohucn-gif/bofa-fms（BofA 原图逐张读取）,样本口径两个：Global FMS 问卷 180 人 / 5250 亿美元（= $525 billion）AUM；总样本 203 人 / 5810 亿美元（= $581 billion）。Chart 25 右侧第二段『growth expectations have risen to the strongest since Feb26』系沿用 7 月旧文案，与本期『net 14%，低于 7 月 2

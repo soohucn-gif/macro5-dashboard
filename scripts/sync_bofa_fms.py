@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""从本地私有存档 bofa-fms 同步**派生数字口径**到本公开仓库。
+"""从本地私有存档 bofa-fms 回补/核对**派生数字口径**。
+
+**这不是常规更新路径。** 常规路径是每月由 Claude routine `macro5-fms-monthly`
+上网读通稿与图表，经 `append_fms.py` 校验后写入 —— 那条路不依赖本机任何东西。
+本脚本只用于两件事：① 一次性回补历史；② 私有存档里有更权威的读图结果时，
+覆盖网上读来的那一期。
 
 刻意只搬三样东西：月度头条数字（现金水位、情绪分、净超配）、最拥挤交易/尾部风险的
 排名与占比、BofA 官方 Contrarian Trades 标签。**不搬图表、不搬报告原文** ——
@@ -9,30 +14,33 @@
     python3 scripts/sync_bofa_fms.py [/path/to/bofa-fms]
 默认路径为本仓库同级目录下的 ../bofa-fms。
 """
-import csv
 import json
 import os
 import sys
 
+from append_fms import CONTRA_FIELDS, CROWDED_FIELDS, merge
 from common import DATA, ROOT
 
 DEFAULT_SRC = os.path.join(os.path.dirname(ROOT), "bofa-fms")
 
 HEAD_FIELDS = ["month", "release_date", "cash_pct", "cash_rule_signal", "sentiment_score",
                "net_ow_equities", "net_ow_us_equities", "n_managers", "aum_usd_bn",
-               "top_crowded_trade", "top_crowded_pct", "top_tail_risk", "top_tail_risk_pct"]
+               "top_crowded_trade", "top_crowded_pct", "top_tail_risk", "top_tail_risk_pct",
+               "confidence", "sources", "notes"]
+ARCHIVE_SRC = "私有存档 soohucn-gif/bofa-fms（BofA 原图逐张读取）"
 
 
 def _n(v):
     return "" if v is None else v
 
 
-def write(path, fields, rows):
-    with open(path, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
-        w.writeheader()
-        w.writerows(rows)
-    return len(rows)
+def merge_by_month(path, fields, rows):
+    """逐月替换写入。**不能整表覆盖** —— 常规路径是 append_fms.py 从网上写入的，
+    存档里没有的月份（比如本机抓取器还没跑到的最新一期）必须原样保留。"""
+    total = 0
+    for month in sorted({r["month"] for r in rows}):
+        total = merge(path, fields, [r for r in rows if r["month"] == month], month)
+    return total
 
 
 def main():
@@ -59,6 +67,8 @@ def main():
             "top_crowded_pct": _n(ct[0].get("pct")) if ct else "",
             "top_tail_risk": tr[0]["name"] if tr else "",
             "top_tail_risk_pct": _n(tr[0].get("pct")) if tr else "",
+            "confidence": "high", "sources": ARCHIVE_SRC,
+            "notes": (m.get("notes") or "")[:200],
         })
         for i, t in enumerate(ct, 1):
             crowded.append({"month": m["month"], "rank": i, "trade": t.get("name", ""),
@@ -78,11 +88,9 @@ def main():
             contra.append({"month": m["month"], "kind": "sector_underweight", "rank": i,
                            "item": t.get("name", ""), "item_cn": "", "pct": _n(t.get("pct"))})
 
-    n1 = write(os.path.join(DATA, "bofa_fms.csv"), HEAD_FIELDS, head)
-    n2 = write(os.path.join(DATA, "bofa_fms_crowded.csv"),
-               ["month", "rank", "trade", "trade_cn", "pct"], crowded)
-    n3 = write(os.path.join(DATA, "bofa_fms_contrarian.csv"),
-               ["month", "kind", "rank", "item", "item_cn", "pct"], contra)
+    n1 = merge_by_month(os.path.join(DATA, "bofa_fms.csv"), HEAD_FIELDS, head)
+    n2 = merge_by_month(os.path.join(DATA, "bofa_fms_crowded.csv"), CROWDED_FIELDS, crowded)
+    n3 = merge_by_month(os.path.join(DATA, "bofa_fms_contrarian.csv"), CONTRA_FIELDS, contra)
     print("bofa_fms: %d 期 / 拥挤交易 %d 行 / 反向与尾部风险 %d 行，最新 %s"
           % (n1, n2, n3, head[-1]["month"] if head else "—"))
 

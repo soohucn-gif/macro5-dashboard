@@ -24,7 +24,7 @@ data/
   gold.csv             date, usd_per_oz
   bitcoin.csv          date, close, high, low
   gpu_rental.csv       date, gpu, segment, usd_per_hr
-  bofa_fms.csv             month, cash_pct, sentiment_score, top_crowded_trade, ...
+  bofa_fms.csv             month, cash_pct, top_crowded_trade, ..., confidence, sources, notes
   bofa_fms_crowded.csv     month, rank, trade, trade_cn, pct
   bofa_fms_contrarian.csv  month, kind, rank, item, item_cn, pct
   dashboard.json       看板内联的十年窗口数据
@@ -66,9 +66,18 @@ Neo-Cloud 与超大规模云两档，H200 / B200 / MI300X 只公开 Neo-Cloud �
 口径提醒：BofA 问卷**只问「最拥挤交易」，没有对称的「最冷门交易」**。看板里的"冷门"分三层：
 官方 Contrarian Trades（最接近官方口径）、绝对仓位里净超配最低的品类、行业情绪里净超配为负的行业。
 
-同步链路：云端 Actions **读不到**本机私有存档，所以这一类由**本机**的
-`bofa-fms-monthly` 定时任务在每期发布后跑 `scripts/sync_bofa_fms.py` 生成 CSV 并推送；
-云端日更只是把已提交的 CSV 读进看板。若超过 45 天没有新一期，看板面板会自己标出来。
+取数链路（**主路径走公开互联网，不依赖本机任何存档**）：
+
+1. **主路径** — `macro5-fms-monthly` 定时任务（每月 16/18/20/22/24 号 09:40）从公开媒体
+   （Reuters / CNBC / ZeroHedge / Mace News / hedgefundtips / 华尔街见闻 等）检索新一期结果，
+   交叉验证后组成 JSON，经 `scripts/append_fms.py` **校验**写入。校验会挡住：缺出处、
+   月份格式错、现金水位越界、拥挤交易缺失等情况 —— 没有出处的数字不进库。
+   每期都记 `sources`（实际读过的 URL）与 `confidence`（high/medium/low）。
+2. **校正路径** — `bofa-fms-monthly` 任务逐张读 BofA 原图（私有存档），比通稿转述更权威；
+   若与主路径写入的数字有出入，用 `scripts/sync_bofa_fms.py` 按月覆盖该期并说明差异。
+3. 云端 Actions 只是把已提交的 CSV 读进看板，不参与取数。
+
+两条路径都是**按月幂等替换**，互不覆盖对方的月份。若超过 45 天没有新一期，看板面板会自己标出来。
 
 ## 运行
 
@@ -77,7 +86,8 @@ python3 scripts/fetch_all.py            # 增量
 python3 scripts/fetch_all.py --full     # 全量回补
 python3 scripts/build_dashboard.py      # 重建 index.html + dashboard.json + latest.md
 python3 scripts/monthly_snapshot.py 2026-08
-python3 scripts/sync_bofa_fms.py            # 仅本机：从 ../bofa-fms 同步派生数字
+python3 scripts/append_fms.py payload.json   # 主路径：写入一期网络来源的 FMS（带校验）
+python3 scripts/sync_bofa_fms.py            # 校正路径：用本机私有存档的原图读数覆盖
 ```
 
 无第三方依赖，Python 3.8+ 即可。
