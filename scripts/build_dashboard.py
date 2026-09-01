@@ -65,7 +65,8 @@ def change(p, label, days):
 
 
 def build():
-    rr = read_csv(os.path.join(DATA, "real_rate_10y.csv"))
+    rr = read_csv(os.path.join(DATA, "real_rates.csv"))
+    ie = read_csv(os.path.join(DATA, "inflation_expectations.csv"))
     eq = read_csv(os.path.join(DATA, "equity_indices.csv"))
     gold = read_csv(os.path.join(DATA, "gold.csv"))
     btc = read_csv(os.path.join(DATA, "bitcoin.csv"))
@@ -75,8 +76,14 @@ def build():
     fms_crowded = read_csv(os.path.join(DATA, "bofa_fms_crowded.csv"))
     fms_contra = read_csv(os.path.join(DATA, "bofa_fms_contrarian.csv"))
 
-    p_rr = panel(rr, {"dfii10": "10年期实际利率 (TIPS)", "dgs10": "10年期名义利率",
-                      "t10yie": "10年期盈亏平衡通胀"})
+    p_rr = panel(rr, {"dfii5": "5年期实际利率", "dfii10": "10年期实际利率",
+                      "dfii30": "30年期实际利率", "dgs5": "5年期名义利率",
+                      "dgs10": "10年期名义利率", "dgs30": "30年期名义利率"})
+    p_ie = panel(ie, {"be10y": "市场 · 10年盈亏平衡", "fwd5y5y": "市场 · 5年后5年远期",
+                      "cleveland_10y": "模型 · 克利夫兰联储10年",
+                      "michigan_1y": "消费者 · 密歇根1年",
+                      "sce_3y": "消费者 · 纽约联储3年",
+                      "sce_5y": "消费者 · 纽约联储5年"}, date_from="2013-06-01")
     p_eq = panel(eq, {"sp500": "标普500", "nasdaq_comp": "纳斯达克综合",
                       "nasdaq_100": "纳斯达克100"})
     p_gold = panel(gold, {"usd_per_oz": "伦敦金 (美元/盎司)"})
@@ -179,7 +186,12 @@ def build():
                      "chg_30": d30 if is_rate else pct30,
                      "chg_365": d365 if is_rate else pct365})
 
-    add_kpi("10年期实际利率", "%", p_rr, "10年期实际利率 (TIPS)", "FRED DFII10 · 日频", True)
+    add_kpi("30年期实际利率", "%", p_rr, "30年期实际利率", "FRED DFII30 · 日频", True)
+    add_kpi("10年期实际利率", "%", p_rr, "10年期实际利率", "FRED DFII10 · 日频", True)
+    add_kpi("5年期实际利率", "%", p_rr, "5年期实际利率", "FRED DFII5 · 日频", True)
+    add_kpi("市场通胀预期(10年)", "%", p_ie, "市场 · 10年盈亏平衡", "FRED T10YIE · 月末", True)
+    add_kpi("消费者通胀预期(5年)", "%", p_ie, "消费者 · 纽约联储5年",
+            "纽约联储 SCE 中位数 · 月频", True)
     add_kpi("隐含股权风险溢价", "%", p_erp, "隐含股权风险溢价", "Damodaran · 月频", True)
     add_kpi("标普500", "", p_eq, "标普500", "FRED SP500 · 日频")
     add_kpi("纳斯达克综合", "", p_eq, "纳斯达克综合", "FRED NASDAQCOM · 日频")
@@ -198,31 +210,43 @@ def build():
         "window_start": WINDOW_START,
         "kpis": kpis,
         "panels": {
-            "real_rate": {"title": "① 10年期实际利率",
-                          "sub": "名义利率 − 预期通胀率。TIPS 收益率是市场对该差值的直接定价，"
-                                 "也是一切风险资产的贴现率锚。",
+            "real_rate": {"title": "① 实际利率期限结构（5 / 10 / 30 年）",
+                          "sub": "TIPS 收益率 = 市场对「名义利率 − 预期通胀」的直接定价，"
+                                 "是一切风险资产的贴现率锚。三个期限一起看才知道曲线是"
+                                 "整体抬升还是只有长端在动 —— 长端实际利率才是压估值的那一根。"
+                                 "名义利率默认收起，图例可点开对照。"
+                                 "30 年期只有 2010-02 起：30 年 TIPS 2001 年停发、2010 年才重启。",
                           "unit": "%", "freq": "日频",
-                          "source": "FRED · DFII10 / DGS10 / T10YIE", "data": p_rr},
-            "erp": {"title": "② 隐含股权风险溢价 (ERP)",
+                          "hidden": ["5年期名义利率", "10年期名义利率", "30年期名义利率"],
+                          "source": "FRED · DFII5/10/30 · DGS5/10/30", "data": p_rr},
+            "infexp": {"title": "② 通胀预期：市场 vs 消费者",
+                       "sub": "两个口径长期系统性打架，必须分开看。市场（TIPS 盈亏平衡）是"
+                              "投资者真金白银押出来的，常年 2%出头；消费者（问卷）对食品、"
+                              "油价、房租这些高频可见价格更敏感，常年高出 1 个百分点以上。"
+                              "「5年后5年远期」剔除了未来五年的短期通胀噪音，是长期预期最干净的读数。",
+                       "unit": "%", "freq": "月频",
+                       "source": "FRED T10YIE / T5YIFR / EXPINF10YR / MICH ＋ 纽约联储 SCE",
+                       "data": p_ie},
+            "erp": {"title": "③ 隐含股权风险溢价 (ERP)",
                     "sub": "Damodaran 以当前指数点位反解出的市场隐含风险补偿。"
                            "隐含预期收益率 = 无风险利率 + ERP。",
                     "unit": "%", "freq": "月频",
                     "source": "NYU Stern · Damodaran ERPbymonth", "data": p_erp},
-            "equity": {"title": "③ 标普500 与纳斯达克",
+            "equity": {"title": "④ 标普500 与纳斯达克",
                        "sub": "美股两大宽基指数收盘点位。", "unit": "点", "freq": "日频",
                        "source": "FRED · SP500 / NASDAQCOM / NASDAQ100", "data": p_eq},
-            "gold": {"title": "④ 黄金", "sub": "伦敦金银市场协会(LBMA)下午定盘价。",
+            "gold": {"title": "⑤ 黄金", "sub": "伦敦金银市场协会(LBMA)下午定盘价。",
                      "unit": "美元/盎司", "freq": "日频",
                      "source": "LBMA 官方定盘价", "data": p_gold},
-            "bitcoin": {"title": "⑤ 比特币", "sub": "Coinbase BTC-USD 日收盘价，对数坐标。",
+            "bitcoin": {"title": "⑥ 比特币", "sub": "Coinbase BTC-USD 日收盘价，对数坐标。",
                         "unit": "美元", "freq": "日频", "log": True,
                         "source": "Coinbase Exchange", "data": p_btc},
-            "gpu": {"title": "⑥ GPU 租赁价格指数",
+            "gpu": {"title": "⑦ GPU 租赁价格指数",
                     "sub": "Silicon Data 各卡型小时租赁基准价。公开层只放出滚动 7 天窗口，"
                            "本仓库每日抓取累积，历史自 2026-08-23 起在此逐日生长。",
                     "unit": "美元/小时", "freq": "日频",
                     "source": "Silicon Data · SiliconIndex", "data": p_gpu},
-            "fms": {"title": "⑦ 美银基金经理调查：拥挤交易与反向交易",
+            "fms": {"title": "⑧ 美银基金经理调查：拥挤交易与反向交易",
                     "sub": "BofA Global FMS 月度问卷。现金水位是老牌反向指标"
                            "（<4.0% 触发 sell signal）；拥挤度看的是共识有多挤，"
                            "反向交易看的是没人站的那一边。" + fms_stale,
@@ -230,7 +254,7 @@ def build():
                     "tables": fms_tables,
                     "source": "BofA Global Fund Manager Survey（派生数字口径，不含原图）",
                     "data": p_fms},
-            "normalized": {"title": "⑧ 跨资产归一对比",
+            "normalized": {"title": "⑨ 跨资产归一对比",
                            "sub": "所选区间的起点 = 100，对数坐标；切换区间基期会跟着走。"
                                   "看的是相对赔率，不是绝对价格。",
                            "unit": "指数 (区间起点=100)", "freq": "日频", "log": True,

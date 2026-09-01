@@ -6,7 +6,8 @@
 
 | # | 模块 | 频率 | 数据源 | 历史起点 |
 |---|---|---|---|---|
-| ① | 10年期实际利率（名义 − 预期通胀） | 日频 | FRED `DFII10` / `DGS10` / `T10YIE` | 2003-01（TIPS）/ 1962（名义） |
+| ① | 实际利率期限结构 5/10/30 年 | 日频 | FRED `DFII5/10/30` · `DGS5/10/30` | 5/10年 2003-01；30年 2010-02 |
+| ② | 通胀预期：市场 vs 消费者 | 月频 | FRED `T10YIE`/`T5YIFR`/`EXPINF*`/`MICH` ＋ 纽约联储 SCE | 市场 2003；SCE 2013-06 |
 | ② | 隐含股权风险溢价 ERP | 月频 | NYU Stern · Damodaran `ERPbymonth.xlsx` | 2008-09 |
 | ③ | 标普500 / 纳斯达克综合 / 纳斯达克100 | 日频 | FRED `SP500` / `NASDAQCOM` / `NASDAQ100` | 标普 10 年上限；纳指 1971 |
 | ④ | 黄金（伦敦金定盘价） | 日频 | LBMA 官方 JSON | 1968-04 |
@@ -18,7 +19,8 @@
 
 ```
 data/
-  real_rate_10y.csv    date, dfii10, dgs10, t10yie, implied_real
+  real_rates.csv       date, dfii5, dfii10, dfii30, dgs5, dgs10, dgs30, t5yie, t10yie, t5yifr, ...
+  inflation_expectations.csv  date, be5y, be10y, be30y, fwd5y5y, cleveland_*, michigan_1y, sce_1y/3y/5y
   erp_monthly.csv      date, erp_t12m, tbond_rate, expected_return, sp500, ...
   equity_indices.csv   date, sp500, nasdaq_comp, nasdaq_100
   gold.csv             date, usd_per_oz
@@ -38,9 +40,20 @@ scripts/               抓取与构建脚本，纯标准库，无需 pip install
 
 ## 几处必须说明的口径
 
-**① 实际利率。** `DFII10` 是 10 年期 TIPS 收益率，市场对「名义 − 预期通胀」这个差值的
-直接定价。同表另存 `DGS10`（名义）与 `T10YIE`（10 年盈亏平衡通胀），并算出
-`implied_real = DGS10 − T10YIE` 作交叉验算 —— 两者通常完全一致或差 1bp。
+**① 实际利率要看期限结构，不能只看 10 年。** `DFII5/10/30` 是 5、10、30 年期 TIPS 收益率。
+三个期限一起看才知道曲线是整体抬升还是只有长端在动 —— **长端实际利率才是压估值的那一根**。
+同表另存对应期限的名义利率与盈亏平衡通胀，并算出 `implied_real = DGS − T*YIE` 作交叉验算。
+30 年期只有 2010-02 起：30 年 TIPS 2001 年停发、2010 年才重启。
+
+**② 通胀预期有两个互不相干的世界，别混成一个数。**
+- **市场口径**（投资者真金白银押的）：TIPS 盈亏平衡 `T5YIE`/`T10YIE`/`T30YIEM`，
+  以及 5 年后 5 年远期 `T5YIFR`（剔除未来五年的短期通胀噪音，长期预期最干净的读数）。
+- **模型口径**：克利夫兰联储 `EXPINF1YR/5YR/10YR/30YR`，把市场价格与调查数据一起入模。
+- **消费者口径**（问卷问出来的）：密歇根大学 1 年期 `MICH`；纽约联储消费者预期调查
+  （SCE）1/3/5 年中位数，从官网 xlsx 直接下载，公开无需授权。
+
+消费者口径长期系统性高于市场口径一个百分点以上 —— 普通人对食品、油价、房租这些
+高频可见价格更敏感，而市场定价的是一篮子 CPI 的加权平均。这个差不是谁错了，是两回事。
 
 **② ERP 的日期约定。** Damodaran 表中标记为 `YYYY-MM-01` 的那一行，用的是**上月最后一个
 交易日**的指数点位反解出来的。所以 `2026-08-01` 这一行描述的是 7 月底的市场状态。

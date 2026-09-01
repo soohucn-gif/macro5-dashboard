@@ -45,9 +45,16 @@ def monthly_range(rows, col):
 
 
 SERIES = [
-    ("10年期实际利率 (TIPS)", "real_rate_10y.csv", "dfii10", "%", True),
-    ("10年期名义利率", "real_rate_10y.csv", "dgs10", "%", True),
-    ("10年期盈亏平衡通胀", "real_rate_10y.csv", "t10yie", "%", True),
+    ("5年期实际利率 (TIPS)", "real_rates.csv", "dfii5", "%", True),
+    ("10年期实际利率 (TIPS)", "real_rates.csv", "dfii10", "%", True),
+    ("30年期实际利率 (TIPS)", "real_rates.csv", "dfii30", "%", True),
+    ("10年期名义利率", "real_rates.csv", "dgs10", "%", True),
+    ("30年期名义利率", "real_rates.csv", "dgs30", "%", True),
+    ("市场通胀预期·10年盈亏平衡", "inflation_expectations.csv", "be10y", "%", True),
+    ("市场通胀预期·5年后5年远期", "inflation_expectations.csv", "fwd5y5y", "%", True),
+    ("消费者通胀预期·密歇根1年", "inflation_expectations.csv", "michigan_1y", "%", True),
+    ("消费者通胀预期·纽约联储3年", "inflation_expectations.csv", "sce_3y", "%", True),
+    ("消费者通胀预期·纽约联储5年", "inflation_expectations.csv", "sce_5y", "%", True),
     ("隐含股权风险溢价", "erp_monthly.csv", "erp_t12m", "%", True),
     ("隐含预期收益率", "erp_monthly.csv", "expected_return", "%", True),
     ("标普500", "equity_indices.csv", "sp500", "点", False),

@@ -199,7 +199,10 @@ document.getElementById("gen").textContent = D.generated_at.replace("T"," ").rep
 // ------------------------------------------------------------------- 图表
 function Chart(box, panel){
   var data=panel.data, labels=Object.keys(data.series);
-  var hidden={}, days=(panel.key==="erp"||panel.key==="gpu")?0:1825;
+  var hidden={};
+  (panel.hidden||[]).forEach(function(l){ hidden[l]=true; });
+  var FULL_RANGE={erp:1, gpu:1, fms:1, infexp:1};
+  var days = FULL_RANGE[panel.key] ? 0 : 1825;
   var svgNS="http://www.w3.org/2000/svg";
   var svg=document.createElementNS(svgNS,"svg");
   var tip=document.createElement("div"); tip.className="tip";
@@ -351,7 +354,8 @@ Object.keys(D.panels).forEach(function(key){
     rbox.lastChild.setAttribute("aria-pressed","true"), ch.setDays(0);
   var lg=card.querySelector(".legend");
   ch.labels.forEach(function(l,li){
-    var b=document.createElement("button"); b.setAttribute("aria-pressed","true");
+    var b=document.createElement("button");
+    b.setAttribute("aria-pressed", ch.isHidden(l)?"false":"true");
     b.innerHTML='<i class="swatch" style="background:'+cssv(COLORS[li%COLORS.length])
       +'"></i>'+l;
     b.onclick=function(){ ch.toggle(l);

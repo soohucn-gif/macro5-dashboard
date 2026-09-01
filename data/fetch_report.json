@@ -1,14 +1,30 @@
 {
+<<<<<<< HEAD
   "run_at_utc": "2026-09-01T05:06:05+00:00",
+=======
+  "run_at_utc": "2026-09-01T04:10:07+00:00",
+>>>>>>> dedebe1 (feat: 实际利率扩为 5/10/30 年期限结构，新增通胀预期市场 vs 消费者面板)
   "full": false,
   "jobs": [
     {
-      "job": "real_rate_10y",
-      "label": "10年期实际利率",
+      "job": "real_rates",
+      "label": "实际利率期限结构",
       "ok": true,
       "rows": 16151,
+<<<<<<< HEAD
       "added": 0,
+=======
+      "added": 16151,
+>>>>>>> dedebe1 (feat: 实际利率扩为 5/10/30 年期限结构，新增通胀预期市场 vs 消费者面板)
       "last_date": "2026-08-31"
+    },
+    {
+      "job": "inflation_expectations",
+      "label": "通胀预期",
+      "ok": true,
+      "rows": 584,
+      "added": 584,
+      "last_date": "2026-08-01"
     },
     {
       "job": "equity_indices",

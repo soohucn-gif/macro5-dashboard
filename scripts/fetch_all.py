@@ -2,7 +2,8 @@
 """五大类数据抓取。每类独立 try，一类挂掉不影响其余，最后汇总退出码。
 
 产出（全部 merge 语义，绝不丢历史）：
-  data/real_rate_10y.csv   10年期实际利率(TIPS)/名义/盈亏平衡通胀   日频  FRED
+  data/real_rates.csv      5/10/30年期实际利率(TIPS)与名义利率      日频  FRED
+  data/inflation_expectations.csv  通胀预期：市场 vs 消费者         月频  FRED + 纽约联储
   data/equity_indices.csv  标普500 / 纳指综合 / 纳指100             日频  FRED
   data/gold.csv            LBMA 伦敦金定盘价 USD/oz                 日频  LBMA
   data/bitcoin.csv         BTC-USD 日收盘                           日频  Coinbase
@@ -27,30 +28,135 @@ TODAY = datetime.date.today()
 FULL = "--full" in sys.argv
 
 
-# ---------------------------------------------------------------- 1. 实际利率
-def fetch_real_rate():
-    """FRED：DFII10 = 10年期通胀保值债券(TIPS)收益率，即市场真实的10年期实际利率。
+# ------------------------------------------------------- 1. 实际利率期限结构
+REAL_SERIES = {"dfii5": "DFII5", "dfii10": "DFII10", "dfii30": "DFII30",
+               "dgs5": "DGS5", "dgs10": "DGS10", "dgs30": "DGS30",
+               "t5yie": "T5YIE", "t10yie": "T10YIE", "t5yifr": "T5YIFR"}
 
-    另抓 DGS10(名义) 与 T10YIE(10年盈亏平衡通胀)，三者满足 DFII10 ≈ DGS10 - T10YIE，
-    正好对应「名义利率 - 预期通胀率」的定义，可交叉验算。
+
+def _fred(sid):
+    return http_get("https://fred.stlouisfed.org/graph/fredgraph.csv?id=" + sid,
+                    browser_ua=False)
+
+
+def fetch_real_rate():
+    """FRED：DFII5 / DFII10 / DFII30 —— 5、10、30 年期通胀保值债券(TIPS)收益率，
+    也就是市场对各期限**实际利率**的直接定价。
+
+    同表存对应期限的名义利率(DGS*)与盈亏平衡通胀(T5YIE/T10YIE)，满足
+    实际 ≈ 名义 − 盈亏平衡通胀，可逐日交叉验算。T5YIFR 是「5年后的5年」远期盈亏平衡，
+    剔除了未来五年的短期通胀噪音，是市场长期通胀预期最干净的读数。
+
+    注意 DFII30 只有 2010-02 起 —— 30 年期 TIPS 在 2001 停发、2010 才重启。
     """
-    series = {"dfii10": "DFII10", "dgs10": "DGS10", "t10yie": "T10YIE"}
     merged = {}
-    for col, sid in series.items():
-        raw = http_get("https://fred.stlouisfed.org/graph/fredgraph.csv?id=" + sid,
-                       browser_ua=False)
-        for d, v in parse_fred_csv(raw, sid):
+    for col, sid in REAL_SERIES.items():
+        for d, v in parse_fred_csv(_fred(sid), sid):
             merged.setdefault(d, {"date": d})[col] = round(v, 2)
     rows = []
     for d in sorted(merged):
         r = merged[d]
-        if r.get("dgs10") is not None and r.get("t10yie") is not None:
-            r["implied_real"] = round(r["dgs10"] - r["t10yie"], 2)
+        for tenor, be in (("5", "t5yie"), ("10", "t10yie")):
+            nom, brk = r.get("dgs" + tenor), r.get(be)
+            if nom is not None and brk is not None:
+                r["implied_real" + tenor] = round(nom - brk, 2)
         rows.append(r)
-    n, added = merge_csv(os.path.join(DATA, "real_rate_10y.csv"),
-                         ["date", "dfii10", "dgs10", "t10yie", "implied_real"],
-                         ("date",), rows)
-    return "real_rate_10y", n, added, rows[-1]["date"] if rows else ""
+    fields = ["date", "dfii5", "dfii10", "dfii30", "dgs5", "dgs10", "dgs30",
+              "t5yie", "t10yie", "t5yifr", "implied_real5", "implied_real10"]
+    n, added = merge_csv(os.path.join(DATA, "real_rates.csv"), fields, ("date",), rows)
+    return "real_rates", n, added, rows[-1]["date"] if rows else ""
+
+
+# ------------------------------------------------ 1b. 通胀预期：市场 vs 消费者
+FRED_MONTHLY_IE = {"be30y": "T30YIEM", "cleveland_1y": "EXPINF1YR",
+                   "cleveland_5y": "EXPINF5YR", "cleveland_10y": "EXPINF10YR",
+                   "cleveland_30y": "EXPINF30YR", "michigan_1y": "MICH"}
+SCE_URL = ("https://www.newyorkfed.org/medialibrary/interactives/sce/sce/"
+           "downloads/data/FRBNY-SCE-Data.xlsx")
+
+
+def _sheet_rows(z, sheet_name):
+    """从 xlsx 里按表名取出二维字符串数组（共享字符串已解引用）。"""
+    wb = z.read("xl/workbook.xml").decode("utf-8", errors="ignore")
+    rels = dict(re.findall(r'Id="(rId\d+)"[^>]*Target="([^"]+)"',
+                           z.read("xl/_rels/workbook.xml.rels").decode("utf-8", "ignore")))
+    tgt = next((rels[r] for n, r in
+                re.findall(r'<sheet name="([^"]+)"[^>]*r:id="(rId\d+)"', wb)
+                if n == sheet_name), None)
+    if tgt is None:
+        raise RuntimeError("xlsx 里找不到工作表 %r" % sheet_name)
+    shared = []
+    if "xl/sharedStrings.xml" in z.namelist():
+        shared = ["".join(t.text or "" for t in si.iter(NS + "t"))
+                  for si in ET.fromstring(z.read("xl/sharedStrings.xml")).findall(NS + "si")]
+    path = "xl/" + tgt.lstrip("/").replace("xl/", "", 1)
+    out = []
+    for row in ET.fromstring(z.read(path)).find(NS + "sheetData").findall(NS + "row"):
+        cells = []
+        for c in row.findall(NS + "c"):
+            v = c.find(NS + "v")
+            if v is None or v.text is None:
+                cells.append("")
+            else:
+                cells.append(shared[int(v.text)] if c.get("t") == "s" else v.text)
+        out.append(cells)
+    return out
+
+
+def _ym(v):
+    """SCE 用 '202607' 这种 YYYYMM，统一成月初日期。"""
+    s = str(v).strip()
+    if not re.fullmatch(r"\d{6}", s):
+        return None
+    return "%s-%s-01" % (s[:4], s[4:])
+
+
+def fetch_inflation_expectations():
+    """通胀预期的两个世界，放同一张表里好直接对照。
+
+    **市场口径**（投资者用真金白银押的）：TIPS 盈亏平衡通胀 5/10/30 年、5年后5年远期。
+    **模型口径**：克利夫兰联储把市场价格与调查数据一起塞进模型算出的 1/5/10/30 年期望。
+    **消费者口径**（问卷问出来的）：密歇根大学 1 年期、纽约联储 SCE 1/3/5 年中位数。
+
+    两个口径长期系统性地不一样 —— 消费者常年高出市场 1 个百分点以上，因为普通人对
+    食品、油价、房租这些高频可见价格更敏感，而市场定价的是一篮子 CPI 的加权平均。
+    看的时候要分开看，不能混成一个「通胀预期」。
+    """
+    merged = {}
+    for col, sid in FRED_MONTHLY_IE.items():
+        for d, v in parse_fred_csv(_fred(sid), sid):
+            merged.setdefault(d, {"date": d})[col] = round(v, 2)
+
+    # 日频的盈亏平衡取每月最后一个有效值，好跟月频序列并排
+    daily = {}
+    for col, sid in (("be5y", "T5YIE"), ("be10y", "T10YIE"), ("fwd5y5y", "T5YIFR")):
+        for d, v in parse_fred_csv(_fred(sid), sid):
+            daily.setdefault(d[:7] + "-01", {})[col] = round(v, 2)
+    for m, vals in daily.items():
+        merged.setdefault(m, {"date": m}).update(vals)
+
+    # 纽约联储消费者预期调查（SCE）—— 公开下载，无需授权
+    z = zipfile.ZipFile(__import__("io").BytesIO(http_get(SCE_URL)))
+    for sheet, cols in (("Inflation expectations", {1: "sce_1y", 2: "sce_3y"}),
+                        ("Five-year ahead Infl Exp", {1: "sce_5y"})):
+        for row in _sheet_rows(z, sheet):
+            d = _ym(row[0] if row else "")
+            if d is None:
+                continue
+            for idx, col in cols.items():
+                if idx < len(row) and row[idx] not in ("", None):
+                    try:
+                        merged.setdefault(d, {"date": d})[col] = round(float(row[idx]), 2)
+                    except ValueError:
+                        pass
+
+    rows = [merged[d] for d in sorted(merged)]
+    fields = ["date", "be5y", "be10y", "be30y", "fwd5y5y",
+              "cleveland_1y", "cleveland_5y", "cleveland_10y", "cleveland_30y",
+              "michigan_1y", "sce_1y", "sce_3y", "sce_5y"]
+    n, added = merge_csv(os.path.join(DATA, "inflation_expectations.csv"),
+                         fields, ("date",), rows)
+    return "inflation_expectations", n, added, rows[-1]["date"] if rows else ""
 
 
 # ------------------------------------------------------------------ 2. 股指
@@ -59,9 +165,7 @@ def fetch_equity():
     series = {"sp500": "SP500", "nasdaq_comp": "NASDAQCOM", "nasdaq_100": "NASDAQ100"}
     merged = {}
     for col, sid in series.items():
-        raw = http_get("https://fred.stlouisfed.org/graph/fredgraph.csv?id=" + sid,
-                       browser_ua=False)
-        for d, v in parse_fred_csv(raw, sid):
+        for d, v in parse_fred_csv(_fred(sid), sid):
             merged.setdefault(d, {"date": d})[col] = round(v, 2)
     rows = [merged[d] for d in sorted(merged)]
     n, added = merge_csv(os.path.join(DATA, "equity_indices.csv"),
@@ -252,7 +356,8 @@ def fetch_erp():
 
 
 # ------------------------------------------------------------------- 主流程
-JOBS = [("10年期实际利率", fetch_real_rate), ("股指", fetch_equity),
+JOBS = [("实际利率期限结构", fetch_real_rate),
+        ("通胀预期", fetch_inflation_expectations), ("股指", fetch_equity),
         ("黄金", fetch_gold), ("比特币", fetch_bitcoin),
         ("GPU租赁指数", fetch_gpu), ("隐含股权风险溢价", fetch_erp)]
 

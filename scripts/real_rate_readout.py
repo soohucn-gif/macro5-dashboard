@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""10年期实际利率的 5 年月末读数表 → data/real_rate_5y_monthly.md。
+"""实际利率期限结构的 5 年月末读数表 → data/real_rate_5y_monthly.md。
 
-日频全量在 data/real_rate_10y.csv；这份是给人看的月度凝缩版，
-额外把「名义 − 盈亏平衡通胀」逐月算出来跟 TIPS 收益率对账。
+日频全量在 data/real_rates.csv；这份是给人看的月度凝缩版：
+5/10/30 年三个期限并排，外加用「名义 − 盈亏平衡通胀」对 10 年期做独立复算。
 """
 import csv
 import datetime
@@ -16,13 +16,14 @@ YEARS = 5
 
 def main():
     rows = []
-    with open(os.path.join(DATA, "real_rate_10y.csv"), encoding="utf-8") as fh:
+    with open(os.path.join(DATA, "real_rates.csv"), encoding="utf-8") as fh:
         for r in csv.DictReader(fh):
             if not r["dfii10"]:
                 continue
             def g(k):
-                return float(r[k]) if r[k] else None
-            rows.append((r["date"], float(r["dfii10"]), g("dgs10"), g("t10yie")))
+                return float(r[k]) if r.get(k) else None
+            rows.append((r["date"], float(r["dfii10"]), g("dgs10"), g("t10yie"),
+                         g("dfii5"), g("dfii30")))
     cut = (datetime.date.today() - datetime.timedelta(days=365 * YEARS)).isoformat()
     win = [r for r in rows if r[0] >= cut]
     vals = [r[1] for r in win]
@@ -30,10 +31,11 @@ def main():
     pct = sum(1 for v in vals if v < cur[1]) / len(vals) * 100
 
     out = [
-        "# 10年期实际利率 · 近 5 年读数",
+        "# 实际利率期限结构 · 近 5 年读数",
         "",
-        "FRED `DFII10` —— 10 年期通胀保值债券(TIPS)收益率，即市场对「名义利率 − 预期通胀率」"
-        "这个差值的直接定价。右侧两列用 `DGS10 − T10YIE` 独立复算，两者应当逐月吻合。",
+        "TIPS 收益率 = 市场对「名义利率 − 预期通胀率」这个差值的直接定价。"
+        "下表以 10 年期为主轴，并列 5 年与 30 年看曲线形态；最右列用 `DGS10 − T10YIE` "
+        "独立复算 10 年期，两者应当逐月吻合。30 年期 2010-02 才有数据。",
         "",
         "| 项 | 值 |", "|---|---|",
         "| 最新 | **%.2f%%**（%s） |" % (cur[1], cur[0]),
@@ -47,18 +49,20 @@ def main():
         "",
         "## 月末读数",
         "",
-        "| 月份 | 实际利率 DFII10 | 名义 DGS10 | 盈亏平衡通胀 T10YIE | 复算 DGS10−T10YIE |",
-        "|---|---:|---:|---:|---:|",
+        "| 月份 | 5年实际 | **10年实际** | 30年实际 | 10年名义 | 10年盈亏平衡 | 复算 |",
+        "|---|---:|---:|---:|---:|---:|---:|",
     ]
     bym = {}
-    for d, a, b, c in win:
-        bym[d[:7]] = (d, a, b, c)
+    for row in win:
+        bym[row[0][:7]] = row
+    def q(x):
+        return "%.2f%%" % x if x is not None else "—"
     for m in sorted(bym):
-        d, a, b, c = bym[m]
-        chk = "%.2f%%" % (b - c) if (b is not None and c is not None) else "—"
-        out.append("| %s | %.2f%% | %s | %s | %s |"
-                   % (m, a, "%.2f%%" % b if b else "—", "%.2f%%" % c if c else "—", chk))
-    out += ["", "> 日频全量见 `data/real_rate_10y.csv`（2003-01 至今）。"]
+        d, a, b, c, f5, f30 = bym[m]
+        chk = q(b - c) if (b is not None and c is not None) else "—"
+        out.append("| %s | %s | **%.2f%%** | %s | %s | %s | %s |"
+                   % (m, q(f5), a, q(f30), q(b), q(c), chk))
+    out += ["", "> 日频全量见 `data/real_rates.csv`（10年/5年 2003-01 起，30年 2010-02 起）。"]
     path = os.path.join(DATA, "real_rate_5y_monthly.md")
     with open(path, "w", encoding="utf-8") as fh:
         fh.write("\n".join(out) + "\n")
