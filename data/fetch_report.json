@@ -1,70 +1,62 @@
 {
-<<<<<<< HEAD
-  "run_at_utc": "2026-09-01T05:06:05+00:00",
-=======
-  "run_at_utc": "2026-09-01T04:10:07+00:00",
->>>>>>> dedebe1 (feat: 实际利率扩为 5/10/30 年期限结构，新增通胀预期市场 vs 消费者面板)
+  "run_at_utc": "2026-09-02T00:12:06+00:00",
   "full": false,
   "jobs": [
     {
       "job": "real_rates",
       "label": "实际利率期限结构",
       "ok": true,
-      "rows": 16151,
-<<<<<<< HEAD
-      "added": 0,
-=======
-      "added": 16151,
->>>>>>> dedebe1 (feat: 实际利率扩为 5/10/30 年期限结构，新增通胀预期市场 vs 消费者面板)
-      "last_date": "2026-08-31"
+      "rows": 16152,
+      "added": 1,
+      "last_date": "2026-09-01"
     },
     {
       "job": "inflation_expectations",
       "label": "通胀预期",
       "ok": true,
-      "rows": 584,
-      "added": 584,
-      "last_date": "2026-08-01"
+      "rows": 585,
+      "added": 1,
+      "last_date": "2026-09-01"
     },
     {
       "job": "equity_indices",
       "label": "股指",
       "ok": true,
-      "rows": 14012,
-      "added": 0,
-      "last_date": "2026-08-31"
+      "rows": 14013,
+      "added": 1,
+      "last_date": "2026-09-01"
     },
     {
       "job": "gold",
       "label": "黄金",
       "ok": true,
-      "rows": 14672,
-      "added": 0,
-      "last_date": "2026-08-28"
+      "rows": 14673,
+      "added": 1,
+      "last_date": "2026-09-01"
     },
     {
       "job": "bitcoin",
       "label": "比特币",
       "ok": true,
-      "rows": 4062,
-      "added": 0,
-      "last_date": "2026-09-01"
+      "rows": 4066,
+      "added": 1,
+      "last_date": "2026-09-02"
     },
     {
       "job": "gpu_rental",
       "label": "GPU租赁指数",
       "ok": true,
-      "rows": 63,
-      "added": 0,
-      "last_date": "2026-08-31"
+      "rows": 70,
+      "added": 7,
+      "last_date": "2026-09-01"
     },
     {
       "job": "erp_monthly",
       "label": "隐含股权风险溢价",
       "ok": true,
-      "rows": 216,
-      "added": 0,
-      "last_date": "2026-08-01"
+      "rows": 217,
+      "added": 1,
+      "last_date": "2026-09-01"
     }
   ]
 }
