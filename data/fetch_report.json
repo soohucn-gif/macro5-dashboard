@@ -1,5 +1,5 @@
 {
-  "run_at_utc": "2026-09-10T00:13:58+00:00",
+  "run_at_utc": "2026-09-10T04:40:47+00:00",
   "full": false,
   "jobs": [
     {
@@ -7,7 +7,7 @@
       "label": "实际利率期限结构",
       "ok": true,
       "rows": 16157,
-      "added": 1,
+      "added": 0,
       "last_date": "2026-09-09"
     },
     {
@@ -23,21 +23,23 @@
       "label": "股指",
       "ok": true,
       "rows": 14018,
-      "added": 1,
+      "added": 0,
       "last_date": "2026-09-09"
     },
     {
-      "job": "fetch_gold",
+      "job": "gold",
       "label": "黄金",
-      "ok": false,
-      "error": "JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+      "ok": true,
+      "rows": 14679,
+      "added": 1,
+      "last_date": "2026-09-09"
     },
     {
       "job": "bitcoin",
       "label": "比特币",
       "ok": true,
       "rows": 4074,
-      "added": 1,
+      "added": 0,
       "last_date": "2026-09-10"
     },
     {
@@ -45,7 +47,7 @@
       "label": "GPU租赁指数",
       "ok": true,
       "rows": 126,
-      "added": 7,
+      "added": 0,
       "last_date": "2026-09-09"
     },
     {
