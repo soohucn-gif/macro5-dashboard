@@ -20,6 +20,10 @@ on:
         description: "同时生成上月月度快照"
         type: boolean
         default: false
+      notify:
+        description: "强制推送一条飞书（忽略当日已推标记）"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -56,7 +60,22 @@ jobs:
         run: python3 scripts/fetch_all.py ${{ steps.mode.outputs.full }}
 
       - name: 重建看板与当日快照
+        id: build
         run: python3 scripts/build_dashboard.py
+
+      # 每天一条飞书私聊（Henry）。always() 保证构建失败也会推"失败"而不是静默；
+      # 脚本内部按 data/last_notify.txt 去重，补枪与月度快照运行不会重复推。
+      - name: 推送飞书
+        if: always()
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_OPEN_ID: ${{ secrets.FEISHU_OPEN_ID }}
+          BUILD_FAILED: ${{ steps.build.outcome == 'failure' }}
+        run: |
+          FORCE=""
+          if [ "${{ github.event.inputs.notify }}" = "true" ]; then FORCE="--force"; fi
+          python3 scripts/notify_feishu.py $FORCE
 
       - name: 生成上月月度快照
         if: steps.mode.outputs.monthly == 'yes'
