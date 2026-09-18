@@ -96,3 +96,13 @@ month,kind,rank,item,item_cn,pct
 2026-08,most_underweight,6,Insurance,,
 2026-08,tail_risk,6,US dollar debasement,美元贬值失序,3
 2026-08,most_underweight,7,REITs,,
+2026-09,contrarian,1,long UK equities / short US equities,,
+2026-09,most_underweight,1,"Bonds (net 48% UW, lowest since May 2022)",,
+2026-09,sector_underweight,1,Staples,,-33
+2026-09,tail_risk,1,Disorderly rise in bond yields,债券收益率无序上升,33
+2026-09,contrarian,2,long staples / short banks,,
+2026-09,most_underweight,2,UK equities (net 35% UW),,
+2026-09,tail_risk,2,AI bubble,AI 泡沫,28
+2026-09,contrarian,3,long small cap / short large cap,,
+2026-09,most_underweight,3,Eurozone equities (net 5% UW),,
+2026-09,tail_risk,3,2nd wave of inflation,第二波通胀,24
