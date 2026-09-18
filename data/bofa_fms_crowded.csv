@@ -35,5 +35,8 @@ month,rank,trade,trade_cn,pct
 2026-08,5,Short Treasuries,做空美债,6
 2026-08,6,Long EM carry trades,做多新兴市场套息交易,5
 2026-09,1,Long global semiconductors,做多全球半导体,53
-2026-09,2,Short US Treasuries,做空美债,18
-2026-09,3,Long Magnificent 7,做多 Mag 7,7
+2026-09,2,Short Treasuries,做空美债,18
+2026-09,3,Long Magnificent 7,做多美股七巨头,7
+2026-09,4,Long global banks,做多全球银行股,6
+2026-09,5,Short US dollar,做空美元,5
+2026-09,6,Long Gold,做多黄金,5
