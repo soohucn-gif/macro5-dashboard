@@ -1,5 +1,5 @@
 {
-  "run_at_utc": "2026-09-20T00:08:34+00:00",
+  "run_at_utc": "2026-09-20T04:52:21+00:00",
   "full": false,
   "jobs": [
     {
@@ -39,7 +39,7 @@
       "label": "比特币",
       "ok": true,
       "rows": 4081,
-      "added": 1,
+      "added": 0,
       "last_date": "2026-09-20"
     },
     {
@@ -47,7 +47,7 @@
       "label": "GPU租赁指数",
       "ok": true,
       "rows": 196,
-      "added": 7,
+      "added": 0,
       "last_date": "2026-09-19"
     },
     {
