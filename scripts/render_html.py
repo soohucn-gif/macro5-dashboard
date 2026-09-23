@@ -199,6 +199,13 @@ document.getElementById("gen").textContent = D.generated_at.replace("T"," ").rep
 // ------------------------------------------------------------------- 图表
 function Chart(box, panel){
   var data=panel.data, labels=Object.keys(data.series);
+  // 同一期限的实际/名义用同色，名义画虚线 —— 两条线之间的竖直间距就是该期限的盈亏平衡通胀
+  var COLOR_MAP=panel.colors||{}, DASH=(panel.dash||[]);
+  function colorOf(l,li){
+    var i = (COLOR_MAP[l]!==undefined) ? COLOR_MAP[l] : li;
+    return cssv(COLORS[i%COLORS.length]);
+  }
+  function dashOf(l){ return DASH.indexOf(l)>=0; }
   var hidden={};
   (panel.hidden||[]).forEach(function(l){ hidden[l]=true; });
   var FULL_RANGE={erp:1, gpu:1, fms:1, infexp:1};
@@ -279,8 +286,10 @@ function Chart(box, panel){
         if(x===null||(panel.log&&x<=0)){ pen=false; continue; }
         d += (pen?"L":"M")+X(i).toFixed(1)+" "+Y(x).toFixed(1)+" "; pen=true;
       }
-      g+='<path d="'+d+'" fill="none" stroke="'+cssv(COLORS[li%COLORS.length])
-        +'" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>';
+      g+='<path d="'+d+'" fill="none" stroke="'+colorOf(l,li)
+        +'" stroke-width="'+(dashOf(l)?1.5:1.8)+'"'
+        +(dashOf(l)?' stroke-dasharray="7 4"':'')
+        +' stroke-linejoin="round" stroke-linecap="round"/>';
     });
     g+='<g id="cross" style="opacity:0"><line y1="'+PT+'" y2="'+(H-PB)
       +'" stroke="'+cssv("--muted")+'" stroke-width="1" stroke-dasharray="3 3"/></g>';
@@ -303,7 +312,7 @@ function Chart(box, panel){
       var v=val(l,i);
       if(v===null) return;
       h+='<div class="t-row"><span><i class="swatch" style="background:'
-        +cssv(COLORS[li%COLORS.length])+'"></i> '+l+'</span><b>'
+        +colorOf(l,li)+(dashOf(l)?';opacity:.55':'')+'"></i> '+l+'</span><b>'
         +fmtNum(v,panel.unit==="%"?"%":"")+'</b></div>';
     });
     tip.innerHTML=h; tip.style.opacity=1;
@@ -317,7 +326,8 @@ function Chart(box, panel){
     tip.style.opacity=0;
     var c=svg.querySelector("#cross"); if(c)c.style.opacity=0;
   });
-  return {draw:draw, setDays:function(d){days=d;draw();},
+  return {draw:draw, colorOf:colorOf, dashOf:dashOf,
+          setDays:function(d){days=d;draw();},
           getDays:function(){return days;},
           toggle:function(l){hidden[l]=!hidden[l];draw();},
           isHidden:function(l){return !!hidden[l];}, labels:labels};
@@ -356,8 +366,8 @@ Object.keys(D.panels).forEach(function(key){
   ch.labels.forEach(function(l,li){
     var b=document.createElement("button");
     b.setAttribute("aria-pressed", ch.isHidden(l)?"false":"true");
-    b.innerHTML='<i class="swatch" style="background:'+cssv(COLORS[li%COLORS.length])
-      +'"></i>'+l;
+    b.innerHTML='<i class="swatch" style="background:'+ch.colorOf(l,li)
+      +(ch.dashOf(l)?';opacity:.55':'')+'"></i>'+l;
     b.onclick=function(){ ch.toggle(l);
       b.setAttribute("aria-pressed", ch.isHidden(l)?"false":"true"); };
     lg.appendChild(b);

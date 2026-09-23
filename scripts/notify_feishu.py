@@ -9,8 +9,10 @@
   - 无论前面抓取/构建成功与否都要发出一条（宁可推"今天出数失败"，不要静默）。
   - 每天只发一条：发成功后把北京日期写进 data/last_notify.txt（随日更一起提交），
     同一天的补枪 / 月度快照运行看到标记就跳过；--force 忽略标记。
+  - 利率**实际与名义都播**，再带一行 10 年盈亏平衡（= 名义 − 实际），
+    这样一眼能看出涨的是钱的价格还是通胀预期。
   - 数据源有 ok:false 的放最前面；30 日变动越过阈值的单独提示：
-    实际利率 ±10bp、股指 ±2%、黄金 ±2%、BTC ±5%。
+    实际/名义利率 ±10bp、股指 ±2%、黄金 ±2%、BTC ±5%。
   - 发送失败以非零退出，让 Actions 把它标红。
 """
 import datetime
@@ -26,10 +28,16 @@ DASHBOARD_URL = "https://soohucn-gif.github.io/macro5-dashboard/"
 BJT = datetime.timezone(datetime.timedelta(hours=8))
 
 # (KPI 名, 展示名, 30 日变动阈值；rate 用 pp、其余用 %)
+# 利率按期限归并告警：报实际利率的变动，只有当同期限名义与实际的变动差
+# （＝盈亏平衡通胀的变动）≥5bp 时才额外点出通胀预期那一半。
+# 否则"实际+22bp、名义+22bp"两条说的是同一件事，占版面还不给信息。
+TENORS = [("30y", "30年期实际利率", "30年期名义利率"),
+          ("10y", "10年期实际利率", "10年期名义利率"),
+          ("5y", "5年期实际利率", "5年期名义利率")]
+RATE_THR = 0.10          # pp
+BE_THR = 0.05            # pp，盈亏平衡自身的变动阈值
+
 WATCH = [
-    ("30年期实际利率", "30y", 0.10),
-    ("10年期实际利率", "10y", 0.10),
-    ("5年期实际利率", "5y", 0.10),
     ("标普500", "标普", 2.0),
     ("纳斯达克综合", "纳指", 2.0),
     ("伦敦金", "黄金", 2.0),
@@ -80,9 +88,19 @@ def compose(dash, report, build_failed):
         return k.get(name)
 
     r30, r10, r5 = g("30年期实际利率"), g("10年期实际利率"), g("5年期实际利率")
+    n30, n10, n5 = g("30年期名义利率"), g("10年期名义利率"), g("5年期名义利率")
     if r30 and r10 and r5:
-        lines.append("实际利率 30y %.2f%% / 10y %.2f%% / 5y %.2f%%  (%s)"
+        lines.append("实际 30y %.2f%% / 10y %.2f%% / 5y %.2f%%  (%s)"
                      % (r30["value"], r10["value"], r5["value"], r10["date"][5:]))
+    if n30 and n10 and n5:
+        lines.append("名义 30y %.2f%% / 10y %.2f%% / 5y %.2f%%"
+                     % (n30["value"], n10["value"], n5["value"]))
+    # 盈亏平衡通胀 = 名义 − 实际，用同一天的 KPI 现算，避免月频那条序列的滞后
+    if n10 and r10 and n10["date"] == r10["date"]:
+        be10 = n10["value"] - r10["value"]
+        be30 = (n30["value"] - r30["value"]) if (n30 and r30) else None
+        lines.append("盈亏平衡 10y %.2f%%%s" %
+                     (be10, "" if be30 is None else " / 30y %.2f%%" % be30))
     erp = g("隐含股权风险溢价")
     if erp:
         lines.append("ERP %.2f%%  (%s)" % (erp["value"], erp["date"][:7]))
@@ -100,6 +118,22 @@ def compose(dash, report, build_failed):
         lines.append("GPU H100 $%.2f/h · B200 $%.2f/h" % (h100["value"], b200["value"]))
 
     alerts = []
+    for short, real_name, nom_name in TENORS:
+        rx, nx = g(real_name), g(nom_name)
+        dr = rx.get("chg_30") if rx else None
+        dn = nx.get("chg_30") if nx else None
+        if dr is None and dn is None:
+            continue
+        # 盈亏平衡的变动 = 名义变动 − 实际变动
+        dbe = (dn - dr) if (dr is not None and dn is not None) else None
+        if dr is not None and abs(dr) >= RATE_THR:
+            tail = ""
+            if dbe is not None and abs(dbe) >= BE_THR:
+                tail = "（通胀预期%+.0fbp）" % (dbe * 100)
+            alerts.append("%s 实际%+.0fbp%s" % (short, dr * 100, tail))
+        elif dbe is not None and abs(dbe) >= BE_THR:
+            # 实际没怎么动，但盈亏平衡动了 —— 这本身就值得说
+            alerts.append("%s 通胀预期%+.0fbp" % (short, dbe * 100))
     for name, short, thr in WATCH:
         x = g(name)
         if not x or x.get("chg_30") is None:

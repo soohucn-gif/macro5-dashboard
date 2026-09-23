@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""实际利率期限结构的 5 年月末读数表 → data/real_rate_5y_monthly.md。
+"""利率期限结构的 5 年月末读数表 → data/real_rate_5y_monthly.md。
 
 日频全量在 data/real_rates.csv；这份是给人看的月度凝缩版：
-5/10/30 年三个期限并排，外加用「名义 − 盈亏平衡通胀」对 10 年期做独立复算。
+5/10/30 年三个期限，每个期限**实际与名义并排**，右侧给 10 年盈亏平衡做对账。
 """
 import csv
 import datetime
@@ -23,7 +23,7 @@ def main():
             def g(k):
                 return float(r[k]) if r.get(k) else None
             rows.append((r["date"], float(r["dfii10"]), g("dgs10"), g("t10yie"),
-                         g("dfii5"), g("dfii30")))
+                         g("dfii5"), g("dfii30"), g("dgs5"), g("dgs30")))
     cut = (datetime.date.today() - datetime.timedelta(days=365 * YEARS)).isoformat()
     win = [r for r in rows if r[0] >= cut]
     vals = [r[1] for r in win]
@@ -31,11 +31,11 @@ def main():
     pct = sum(1 for v in vals if v < cur[1]) / len(vals) * 100
 
     out = [
-        "# 实际利率期限结构 · 近 5 年读数",
+        "# 利率期限结构（实际 vs 名义）· 近 5 年读数",
         "",
-        "TIPS 收益率 = 市场对「名义利率 − 预期通胀率」这个差值的直接定价。"
-        "下表以 10 年期为主轴，并列 5 年与 30 年看曲线形态；最右列用 `DGS10 − T10YIE` "
-        "独立复算 10 年期，两者应当逐月吻合。30 年期 2010-02 才有数据。",
+        "每个期限的**实际与名义并排**：TIPS 是实际利率，普通国债是名义利率，"
+        "两者之差就是该期限的盈亏平衡通胀。最右两列用 `DGS10 − T10YIE` 复算 10 年期实际利率，"
+        "应与 DFII10 逐月吻合。30 年期 2010-02 才有数据（30 年 TIPS 2001 停发、2010 重启）。",
         "",
         "| 项 | 值 |", "|---|---|",
         "| 最新 | **%.2f%%**（%s） |" % (cur[1], cur[0]),
@@ -49,8 +49,8 @@ def main():
         "",
         "## 月末读数",
         "",
-        "| 月份 | 5年实际 | **10年实际** | 30年实际 | 10年名义 | 10年盈亏平衡 | 复算 |",
-        "|---|---:|---:|---:|---:|---:|---:|",
+        "| 月份 | 5年实际 | 5年名义 | **10年实际** | 10年名义 | 30年实际 | 30年名义 | 10年盈亏平衡 | 复算 |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     bym = {}
     for row in win:
@@ -58,10 +58,10 @@ def main():
     def q(x):
         return "%.2f%%" % x if x is not None else "—"
     for m in sorted(bym):
-        d, a, b, c, f5, f30 = bym[m]
+        d, a, b, c, f5, f30, n5, n30 = bym[m]
         chk = q(b - c) if (b is not None and c is not None) else "—"
-        out.append("| %s | %s | **%.2f%%** | %s | %s | %s | %s |"
-                   % (m, q(f5), a, q(f30), q(b), q(c), chk))
+        out.append("| %s | %s | %s | **%.2f%%** | %s | %s | %s | %s | %s |"
+                   % (m, q(f5), q(n5), a, q(b), q(f30), q(n30), q(c), chk))
     out += ["", "> 日频全量见 `data/real_rates.csv`（10年/5年 2003-01 起，30年 2010-02 起）。"]
     path = os.path.join(DATA, "real_rate_5y_monthly.md")
     with open(path, "w", encoding="utf-8") as fh:

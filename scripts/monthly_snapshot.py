@@ -48,6 +48,7 @@ SERIES = [
     ("5年期实际利率 (TIPS)", "real_rates.csv", "dfii5", "%", True),
     ("10年期实际利率 (TIPS)", "real_rates.csv", "dfii10", "%", True),
     ("30年期实际利率 (TIPS)", "real_rates.csv", "dfii30", "%", True),
+    ("5年期名义利率", "real_rates.csv", "dgs5", "%", True),
     ("10年期名义利率", "real_rates.csv", "dgs10", "%", True),
     ("30年期名义利率", "real_rates.csv", "dgs30", "%", True),
     ("市场通胀预期·10年盈亏平衡", "inflation_expectations.csv", "be10y", "%", True),
