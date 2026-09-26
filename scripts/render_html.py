@@ -106,8 +106,11 @@ footer a{color:var(--accent)}
 footer ul{padding-left:18px;margin:8px 0}
 .note{background:var(--chip);border-radius:8px;padding:10px 12px;font-size:12px;
   color:var(--muted);margin:0 0 12px}
-@media(max-width:560px){h1{font-size:19px} .wrap{padding:20px 13px 48px}
-  .kpi .k-val{font-size:19px}}
+@media(max-width:560px){h1{font-size:19px} .wrap{padding:20px 12px 48px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .kpi{padding:10px 11px} .kpi .k-val{font-size:18px}
+  .kpi .k-row{flex-wrap:wrap;gap:1px 7px}
+  .card{padding:14px 12px 10px}}
 </style>
 </head>
 <body>
@@ -115,7 +118,7 @@ footer ul{padding-left:18px;margin:8px 0}
 <header>
   <div>
     <h1>五大类数据看板</h1>
-    <div class="sub">实际利率 · 股权风险溢价 · 股指 · 黄金 · 比特币 · GPU 租赁价格</div>
+    <div class="sub">利率期限结构 · 通胀预期 · 股权风险溢价 · 股指 · 黄金 · 比特币 · GPU 租赁 · 美银 FMS</div>
   </div>
   <div class="sub tnum">最后更新 <span id="gen"></span></div>
 </header>
@@ -124,9 +127,12 @@ footer ul{padding-left:18px;margin:8px 0}
 <footer>
   <div><b>数据来源</b></div>
   <ul>
-    <li>10年期实际利率 — FRED 圣路易斯联储：<code>DFII10</code>（10年期通胀保值债券收益率）、
-        <code>DGS10</code>（名义）、<code>T10YIE</code>（10年盈亏平衡通胀）。
-        三者满足 DFII10 ≈ DGS10 − T10YIE。</li>
+    <li>利率期限结构 — FRED 圣路易斯联储：<code>DFII5/10/30</code>（通胀保值债券 TIPS 实际利率）、
+        <code>DGS5/10/30</code>（名义）、<code>T5YIE</code>/<code>T10YIE</code>（盈亏平衡通胀）。
+        同期限满足 实际 ≈ 名义 − 盈亏平衡。</li>
+    <li>通胀预期 — FRED：<code>T10YIE</code>、<code>T5YIFR</code>（5年后5年远期）、
+        <code>EXPINF10YR</code>（克利夫兰联储模型）、<code>MICH</code>（密歇根大学）；
+        纽约联储消费者预期调查（SCE）官网公开数据。</li>
     <li>隐含股权风险溢价 — NYU Stern，Aswath Damodaran，<code>ERPbymonth.xlsx</code>，月频。</li>
     <li>标普500 / 纳斯达克 — FRED：<code>SP500</code>、<code>NASDAQCOM</code>、<code>NASDAQ100</code>。</li>
     <li>黄金 — LBMA 伦敦金银市场协会官方下午定盘价（美元/盎司）。</li>
@@ -136,7 +142,7 @@ footer ul{padding-left:18px;margin:8px 0}
     <li>美银基金经理调查 — BofA Global Fund Manager Survey，每月中旬发布。本仓库只收录
         <b>派生的数字口径</b>（现金水位、拥挤交易与尾部风险的排名占比、官方 Contrarian
         Trades 标签），<b>不转载 BofA 原始图表与报告正文</b>，其版权归 BofA Global
-        Research 所有。数据由本机私有存档按月同步。</li>
+        Research 所有。每月由定时任务从公开报道检索、交叉验证后写入，再以私有存档的原图读数校正。</li>
   </ul>
   <div>完整历史 CSV 见仓库 <code>data/</code> 目录。本页由 GitHub Actions 每日自动重建，
   不构成投资建议。</div>
@@ -149,14 +155,35 @@ footer ul{padding-left:18px;margin:8px 0}
 var D = JSON.parse(document.getElementById("payload").textContent);
 var COLORS = ["--c1","--c2","--c3","--c4","--c5","--c6","--c7"];
 var RANGES = [["1年",365],["3年",1095],["5年",1825],["10年",3660],["全部",0]];
+var DAY = 864e5;
 
 function cssv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+// 数据里的文字（FMS 条目是定时任务从网上读来的）一律转义后再进 innerHTML
+function esc(s){
+  return String(s===null||s===undefined?"":s).replace(/[&<>"']/g,function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});
+}
 function fmtNum(v,unit){
   if(v===null||v===undefined) return "—";
   if(unit==="%") return v.toFixed(2)+"%";
   if(Math.abs(v)>=1000) return v.toLocaleString("en-US",{maximumFractionDigits:0});
   if(Math.abs(v)>=100) return v.toFixed(1);
   return v.toFixed(2);
+}
+// 纵轴刻度：同一根轴小数位一致（按步长定），免得出现「80.00 / 100.0」混排；
+// dp 为 null 时（对数轴的 1/2/5 刻度）按各自最短写法
+function fmtTick(t,dp,pct){
+  var s = Math.abs(t)>=1000 ? t.toLocaleString("en-US",{maximumFractionDigits:0})
+        : dp===null ? String(+t.toFixed(4)) : t.toFixed(dp);
+  return pct ? s+"%" : s;
+}
+function stepDp(t){
+  var step = t.length>1 ? t[1]-t[0] : 1;
+  return step>=1 ? 0 : Math.min(4, Math.ceil(-Math.log10(step)-1e-9));
+}
+function textW(s){   // 11px 字号下的粗略字宽，排版用
+  var w=0; for(var i=0;i<s.length;i++) w += s.charCodeAt(i)>0x2e80 ? 11 : 6.6;
+  return w;
 }
 function niceTicks(lo,hi,n){
   if(lo===hi){lo-=1;hi+=1;}
@@ -171,7 +198,41 @@ function logTicks(lo,hi){
   for(var e=Math.floor(Math.log10(lo)); e<=Math.ceil(Math.log10(hi)); e++){
     [1,2,5].forEach(function(m){var v=m*Math.pow(10,e); if(v>=lo&&v<=hi) t.push(v);});
   }
-  return t.length>=3?t:niceTicks(lo,hi,4);
+  return t;
+}
+function dayNum(s){ return Date.UTC(+s.slice(0,4), +s.slice(5,7)-1, +s.slice(8,10))/DAY; }
+// 时间轴刻度落在真实的日历边界上（整周 / 月初 / 季初 / 年初），疏密随图宽走
+var XUNITS=[["d",1],["d",7],["d",14],["m",1],["m",2],["m",3],["m",6],
+            ["y",1],["y",2],["y",5],["y",10]];
+function xTicks(dates,i0,i1,plotW){
+  var span=dayNum(dates[i1-1])-dayNum(dates[i0]);
+  var maxN=Math.max(2, Math.min(12, Math.floor(plotW/56)));
+  for(var u=0;u<XUNITS.length;u++){
+    var kind=XUNITS[u][0], k=XUNITS[u][1];
+    var per = kind==="d" ? k : kind==="m" ? 30.44*k : 365.25*k;
+    if(span/per>maxN && u<XUNITS.length-1) continue;
+    var key=function(s){
+      if(kind==="d") return Math.floor((dayNum(s)+3)/k);           // +3：整周从周一起算
+      if(kind==="m") return Math.floor(((+s.slice(0,4))*12+(+s.slice(5,7))-1)/k);
+      return Math.floor((+s.slice(0,4))/k);
+    };
+    var label=function(s){
+      if(kind==="d") return s.slice(5);
+      if(kind==="m" && s.slice(5,7)!=="01") return (+s.slice(5,7))+"月";
+      return s.slice(0,4);
+    };
+    // 区间起点也可能正好是边界：跟前一个点（最左端则跟前一天）比
+    var prev=key(i0>0 ? dates[i0-1]
+                      : new Date((dayNum(dates[i0])-1)*DAY).toISOString().slice(0,10));
+    var out=[];
+    for(var i=i0;i<i1;i++){
+      var kk=key(dates[i]);
+      if(kk!==prev) out.push({i:i, label:label(dates[i])});
+      prev=kk;
+    }
+    return out;
+  }
+  return [];
 }
 
 // ------------------------------------------------------------------ KPI 卡片
@@ -183,15 +244,16 @@ D.kpis.forEach(function(k){
     var s = k.is_rate ? (x>0?"+":"")+x.toFixed(2)+"pp" : (x>0?"+":"")+x.toFixed(1)+"%";
     return '<span class="'+cls+'">'+s+'</span>';
   }
-  var unit = k.unit==="%" ? "%" : (k.unit?'<span class="k-unit">'+k.unit+'</span>':"");
+  var unit = k.unit==="%" ? "%" : (k.unit?'<span class="k-unit">'+esc(k.unit)+'</span>':"");
   var val = k.unit==="%" ? k.value.toFixed(2)
           : k.value>=1000 ? k.value.toLocaleString("en-US",{maximumFractionDigits:0})
           : k.value.toFixed(2);
-  kh += '<div class="kpi"><div class="k-name">'+k.name+'</div>'
+  kh += '<div class="kpi"><div class="k-name">'+esc(k.name)+'</div>'
       + '<div class="k-val">'+val+unit+'</div>'
       + '<div class="k-row"><span>30日</span>'+d(k.chg_30)
       + '<span>一年</span>'+d(k.chg_365)+'</div>'
-      + '<div class="k-foot">'+k.date+' · '+k.note+'</div></div>';
+      + '<div class="k-foot">'+(k.stale_days ? '<b class="down">⚠ '+k.stale_days+' 天没更新</b> · ' : '')
+      + esc(k.date)+' · '+esc(k.note)+'</div></div>';
 });
 document.getElementById("kpis").innerHTML = kh;
 document.getElementById("gen").textContent = D.generated_at.replace("T"," ").replace("Z"," UTC");
@@ -214,7 +276,8 @@ function Chart(box, panel){
   var svg=document.createElementNS(svgNS,"svg");
   var tip=document.createElement("div"); tip.className="tip";
   box.appendChild(svg); box.appendChild(tip);
-  var W=980,H=300,PL=54,PR=14,PT=12,PB=26, view=null;
+  // 按容器的真实像素宽度作图（viewBox 与显示尺寸 1:1）：手机上字号不再跟着整张图缩成 4px
+  var W=980,H=300,PL=54,PR=14,PT=12,PB=26, view=null, drawnFor=-1;
 
   function slice(){
     if(!days) return {i0:0,i1:data.dates.length};
@@ -243,6 +306,9 @@ function Chart(box, panel){
     return b ? x/b*100 : null;
   }
   function draw(){
+    drawnFor=box.clientWidth;
+    W=Math.max(240, drawnFor||980);
+    H=Math.round(Math.min(320, Math.max(220, W*0.3)));
     var s=slice(), lo=Infinity, hi=-Infinity, any=false;
     computeBases(s);
     labels.forEach(function(l){
@@ -251,10 +317,16 @@ function Chart(box, panel){
         if(x!==null&&(!panel.log||x>0)){ any=true;
           if(x<lo)lo=x; if(x>hi)hi=x; } }
     });
-    if(!any){ svg.innerHTML=""; return; }
+    if(!any){ svg.innerHTML=""; view=null; return; }
     var pad=(hi-lo)*0.08||Math.abs(hi)*0.05||1;
     var ylo=panel.log?lo/1.15:lo-pad, yhi=panel.log?hi*1.15:hi+pad;
     if(!panel.log && ylo>0 && ylo<(yhi-ylo)*0.35) ylo=0;
+    var ticks, dp=null, pct=panel.unit==="%";
+    if(panel.log) ticks=logTicks(ylo,yhi);
+    if(!panel.log || ticks.length<3){ ticks=niceTicks(ylo,yhi,panel.log?4:5); dp=stepDp(ticks); }
+    ticks=ticks.filter(function(t){ return t>=ylo&&t<=yhi; });
+    var tl=ticks.map(function(t){ return fmtTick(t,dp,pct); });
+    PL=Math.ceil(Math.max.apply(null, tl.map(textW).concat([18]))+12);
     var n=s.i1-s.i0;
     function X(i){ return PL+(n<2?0:(i-s.i0)/(n-1)*(W-PL-PR)); }
     function Y(v){
@@ -262,28 +334,28 @@ function Chart(box, panel){
         return PT+(1-(Math.log10(v)-a)/(b-a))*(H-PT-PB); }
       return PT+(1-(v-ylo)/(yhi-ylo))*(H-PT-PB);
     }
-    var ticks=panel.log?logTicks(ylo,yhi):niceTicks(ylo,yhi,5);
+    var grid=cssv("--grid"), muted=cssv("--muted");
     var g='<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="none"/>';
-    ticks.forEach(function(t){
-      if(t<ylo||t>yhi) return; var y=Y(t);
+    ticks.forEach(function(t,k){
+      var y=Y(t);
       g+='<line x1="'+PL+'" y1="'+y.toFixed(1)+'" x2="'+(W-PR)+'" y2="'+y.toFixed(1)
-        +'" stroke="'+cssv("--grid")+'" stroke-width="1"/>'
+        +'" stroke="'+grid+'" stroke-width="1"/>'
         +'<text x="'+(PL-7)+'" y="'+(y+3.5).toFixed(1)+'" text-anchor="end" font-size="11" '
-        +'fill="'+cssv("--muted")+'">'+fmtNum(t,panel.unit==="%"?"%":"")+'</text>';
+        +'fill="'+muted+'">'+tl[k]+'</text>';
     });
-    var seen={},step=Math.max(1,Math.floor(n/7));
-    for(var i=s.i0;i<s.i1;i+=step){
-      var lab=n>900?data.dates[i].slice(0,4):data.dates[i].slice(0,7);
-      if(seen[lab])continue; seen[lab]=1;
-      g+='<text x="'+X(i).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" font-size="11" '
-        +'fill="'+cssv("--muted")+'">'+lab+'</text>';
-    }
+    xTicks(data.dates,s.i0,s.i1,W-PL-PR).forEach(function(t){
+      var x=X(t.i), hw=textW(t.label)/2;
+      var anchor = x+hw>W-1 ? "end" : x-hw<1 ? "start" : "middle";   // 贴边的标签别被裁掉
+      g+='<text x="'+x.toFixed(1)+'" y="'+(H-8)+'" text-anchor="'+anchor+'" font-size="11" '
+        +'fill="'+muted+'">'+t.label+'</text>';
+    });
     labels.forEach(function(l,li){
       if(hidden[l]) return;
+      // 缺测点跳过但不断笔：周末/假日没报价的序列（跨资产图里的股指、黄金）不会被切成虚线
       var d="", pen=false;
       for(var i=s.i0;i<s.i1;i++){
         var x=val(l,i);
-        if(x===null||(panel.log&&x<=0)){ pen=false; continue; }
+        if(x===null||(panel.log&&x<=0)) continue;
         d += (pen?"L":"M")+X(i).toFixed(1)+" "+Y(x).toFixed(1)+" "; pen=true;
       }
       g+='<path d="'+d+'" fill="none" stroke="'+colorOf(l,li)
@@ -291,8 +363,8 @@ function Chart(box, panel){
         +(dashOf(l)?' stroke-dasharray="7 4"':'')
         +' stroke-linejoin="round" stroke-linecap="round"/>';
     });
-    g+='<g id="cross" style="opacity:0"><line y1="'+PT+'" y2="'+(H-PB)
-      +'" stroke="'+cssv("--muted")+'" stroke-width="1" stroke-dasharray="3 3"/></g>';
+    g+='<line class="cross" y1="'+PT+'" y2="'+(H-PB)+'" stroke="'+muted
+      +'" stroke-width="1" stroke-dasharray="3 3" style="opacity:0"/>';
     svg.setAttribute("viewBox","0 0 "+W+" "+H);
     svg.innerHTML=g;
     view={s:s,X:X,Y:Y,n:n};
@@ -303,16 +375,16 @@ function Chart(box, panel){
     var frac=(cx-PL)/(W-PL-PR);
     var i=Math.round(view.s.i0+frac*(view.n-1));
     i=Math.max(view.s.i0,Math.min(view.s.i1-1,i));
-    var cross=svg.querySelector("#cross");
+    var cross=svg.querySelector(".cross");
     if(cross){ cross.style.opacity=1;
-      cross.firstChild.setAttribute("x1",view.X(i)); cross.firstChild.setAttribute("x2",view.X(i)); }
-    var h='<div class="t-date">'+data.dates[i]+'</div>';
+      cross.setAttribute("x1",view.X(i)); cross.setAttribute("x2",view.X(i)); }
+    var h='<div class="t-date">'+esc(data.dates[i])+'</div>';
     labels.forEach(function(l,li){
       if(hidden[l]) return;
       var v=val(l,i);
       if(v===null) return;
       h+='<div class="t-row"><span><i class="swatch" style="background:'
-        +colorOf(l,li)+(dashOf(l)?';opacity:.55':'')+'"></i> '+l+'</span><b>'
+        +colorOf(l,li)+(dashOf(l)?';opacity:.55':'')+'"></i> '+esc(l)+'</span><b>'
         +fmtNum(v,panel.unit==="%"?"%":"")+'</b></div>';
     });
     tip.innerHTML=h; tip.style.opacity=1;
@@ -320,13 +392,16 @@ function Chart(box, panel){
     tip.style.left=Math.max(4,Math.min(r.width-tip.offsetWidth-4,px+12))+"px";
     tip.style.top="8px";
   }
+  function touch(e){ if(e.touches.length) onMove(e.touches[0]); }
   svg.addEventListener("mousemove",onMove);
-  svg.addEventListener("touchmove",function(e){onMove(e.touches[0]);},{passive:true});
+  svg.addEventListener("touchstart",touch,{passive:true});
+  svg.addEventListener("touchmove",touch,{passive:true});
   svg.addEventListener("mouseleave",function(){
     tip.style.opacity=0;
-    var c=svg.querySelector("#cross"); if(c)c.style.opacity=0;
+    var c=svg.querySelector(".cross"); if(c)c.style.opacity=0;
   });
   return {draw:draw, colorOf:colorOf, dashOf:dashOf,
+          fit:function(){ if(box.clientWidth!==drawnFor) draw(); },
           setDays:function(d){days=d;draw();},
           getDays:function(){return days;},
           toggle:function(l){hidden[l]=!hidden[l];draw();},
@@ -338,13 +413,13 @@ Object.keys(D.panels).forEach(function(key){
   var p=D.panels[key]; p.key=key;
   if(!p.data.dates.length) return;
   var card=document.createElement("div"); card.className="card";
-  card.innerHTML='<div class="card-top"><div><h2>'+p.title+'</h2>'
-    +'<p class="desc">'+p.sub+'</p></div><div class="ranges"></div></div>'
+  card.innerHTML='<div class="card-top"><div><h2>'+esc(p.title)+'</h2>'
+    +'<p class="desc">'+esc(p.sub)+'</p></div><div class="ranges"></div></div>'
     +'<div class="legend"></div><div class="chartbox"></div>'
     +'<div class="xsec"></div>'
-    +'<div class="src"><span>来源：'+p.source+'</span><span>'+p.freq
-    +' · 单位：'+p.unit+' · '+p.data.dates[0]+' → '
-    +p.data.dates[p.data.dates.length-1]+'（'+p.data.dates.length+' 点）</span></div>';
+    +'<div class="src"><span>来源：'+esc(p.source)+'</span><span>'+esc(p.freq)
+    +' · 单位：'+esc(p.unit)+' · '+esc(p.data.dates[0])+' → '
+    +esc(p.data.dates[p.data.dates.length-1])+'（'+p.data.dates.length+' 点）</span></div>';
   host.appendChild(card);
   var ch=Chart(card.querySelector(".chartbox"), p);
   var rbox=card.querySelector(".ranges");
@@ -367,7 +442,7 @@ Object.keys(D.panels).forEach(function(key){
     var b=document.createElement("button");
     b.setAttribute("aria-pressed", ch.isHidden(l)?"false":"true");
     b.innerHTML='<i class="swatch" style="background:'+ch.colorOf(l,li)
-      +(ch.dashOf(l)?';opacity:.55':'')+'"></i>'+l;
+      +(ch.dashOf(l)?';opacity:.55':'')+'"></i>'+esc(l);
     b.onclick=function(){ ch.toggle(l);
       b.setAttribute("aria-pressed", ch.isHidden(l)?"false":"true"); };
     lg.appendChild(b);
@@ -375,18 +450,18 @@ Object.keys(D.panels).forEach(function(key){
   var xs=card.querySelector(".xsec");
   if(p.tables && p.tables.length){
     card.querySelector("h2").insertAdjacentHTML("beforeend",
-      '<span class="xmonth">当期截面 '+(p.month||"")+'</span>');
+      '<span class="xmonth">当期截面 '+esc(p.month||"")+'</span>');
     xs.innerHTML = p.tables.map(function(t){
       var mx = Math.max.apply(null, t.items.map(function(i){
         return Math.abs(i.pct||0);}).concat([1]));
-      return '<div><h3>'+t.title+'</h3><p class="xnote">'+t.note+'</p>'
+      return '<div><h3>'+esc(t.title)+'</h3><p class="xnote">'+esc(t.note)+'</p>'
         + t.items.map(function(i){
             var pctTxt = (i.pct===null||i.pct===undefined) ? "" : '<i>'+i.pct+'%</i>';
             var bar = (i.pct===null||i.pct===undefined) ? ""
               : '<div class="xbar"><span style="width:'+(Math.abs(i.pct)/mx*100).toFixed(1)
                 +'%'+(i.pct<0?';background:var(--c5)':'')+'"></span></div>';
-            var en = i.en ? '<span class="xen">'+i.en+'</span>' : "";
-            return '<div class="xrow"><div class="xhead"><b>'+i.label+'</b>'+pctTxt+'</div>'
+            var en = i.en ? '<span class="xen">'+esc(i.en)+'</span>' : "";
+            return '<div class="xrow"><div class="xhead"><b>'+esc(i.label)+'</b>'+pctTxt+'</div>'
                  + en + bar + '</div>';
           }).join("")
         + '</div>';
@@ -394,7 +469,16 @@ Object.keys(D.panels).forEach(function(key){
   } else { xs.remove(); }
   ch.draw(); charts.push(ch);
 });
-addEventListener("resize", function(){ charts.forEach(function(c){c.draw();}); });
+// 图宽一变（转屏、拖窗口、首屏画完后页面变长冒出滚动条）就按新宽度重画；rAF 合并连发事件，
+// 只比宽度 —— 手机上滚动时地址栏伸缩只改高度，不触发重画
+var pending=0;
+function refit(){
+  if(pending) return;
+  pending=requestAnimationFrame(function(){ pending=0; charts.forEach(function(c){c.fit();}); });
+}
+refit();
+if(window.ResizeObserver) new ResizeObserver(refit).observe(host);
+else addEventListener("resize", refit);
 if(window.matchMedia) matchMedia("(prefers-color-scheme:dark)")
   .addEventListener("change", function(){ charts.forEach(function(c){c.draw();}); });
 })();

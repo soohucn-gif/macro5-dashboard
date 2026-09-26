@@ -3,6 +3,7 @@
 import csv
 import gzip
 import io
+import json
 import os
 import time
 import urllib.error
@@ -15,11 +16,15 @@ UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
 
 
-def http_get(url, tries=4, timeout=60, headers=None, browser_ua=True):
-    """带重试的 GET，返回 bytes。指数退避，最后一次失败才抛。
+def http_get(url, tries=4, timeout=60, headers=None, browser_ua=True, parse=None):
+    """带重试的 GET，返回 bytes（给了 parse 则返回 parse(bytes)）。指数退避，最后一次失败才抛。
 
     browser_ua=False 时不发浏览器 UA —— FRED 对带浏览器 UA 的非浏览器请求会挂起到
     超时，反而是 urllib 默认 UA 秒回，所以 FRED 必须走这条路。
+
+    parse 在重试循环**里面**跑：上游偶尔回 200 但正文是空的或是一张 HTML 错误页
+    （LBMA 2026-09 就有 5 次 JSONDecodeError），只看状态码拦不住，解析失败也要算
+    这一次没抓到、照样退避重试。
     """
     hdr = {"Accept-Encoding": "gzip"}
     if browser_ua:
@@ -34,12 +39,23 @@ def http_get(url, tries=4, timeout=60, headers=None, browser_ua=True):
                 raw = r.read()
                 if r.headers.get("Content-Encoding") == "gzip":
                     raw = gzip.decompress(raw)
-                return raw
+            return parse(raw) if parse else raw
         except Exception as e:            # noqa: BLE001 — 上层统一处理
             last = e
             if i < tries - 1:
                 time.sleep(2 ** i * 1.5)
-    raise RuntimeError("GET failed after %d tries: %s (%s)" % (tries, url, last))
+    raise RuntimeError("GET failed after %d tries: %s (%s: %s)"
+                       % (tries, url, type(last).__name__, last))
+
+
+def http_get_json(url, expect=None, **kw):
+    """GET 并解析 JSON。空正文、HTML 错误页、顶层类型不是 expect，都算一次失败进重试。"""
+    def parse(raw):
+        v = json.loads(raw.decode("utf-8"))
+        if expect is not None and not isinstance(v, expect):
+            raise ValueError("expected JSON %s, got %s" % (expect.__name__, type(v).__name__))
+        return v
+    return http_get(url, parse=parse, **kw)
 
 
 def read_csv(path):
@@ -71,9 +87,14 @@ def merge_csv(path, fields, key, new_rows):
 
 
 def parse_fred_csv(raw, colname):
-    """FRED fredgraph.csv → [(date, float)]，'.' 表示缺测，跳过。"""
+    """FRED fredgraph.csv → [(date, float)]，'.' 表示缺测，跳过。
+
+    表头里没有这条序列（多半是回了一张错误页）就抛错，别当成「今天没新数据」悄悄吞掉。
+    """
     out = []
     rdr = csv.DictReader(io.StringIO(raw.decode("utf-8")))
+    if not rdr.fieldnames or colname not in rdr.fieldnames:
+        raise ValueError("FRED %s: unexpected header %r" % (colname, (rdr.fieldnames or [])[:3]))
     date_key = rdr.fieldnames[0]
     for row in rdr:
         v = (row.get(colname) or "").strip()
