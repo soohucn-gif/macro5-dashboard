@@ -15,6 +15,8 @@
   python3 scripts/fetch_all.py --full     # 全量回补（首次运行）
 """
 import datetime
+import functools
+import io
 import json
 import os
 import re
@@ -22,7 +24,7 @@ import sys
 import xml.etree.ElementTree as ET
 import zipfile
 
-from common import DATA, http_get, merge_csv, parse_fred_csv, read_csv
+from common import DATA, http_get, http_get_json, merge_csv, parse_fred_csv, read_csv
 
 TODAY = datetime.date.today()
 FULL = "--full" in sys.argv
@@ -34,9 +36,17 @@ REAL_SERIES = {"dfii5": "DFII5", "dfii10": "DFII10", "dfii30": "DFII30",
                "t5yie": "T5YIE", "t10yie": "T10YIE", "t5yifr": "T5YIFR"}
 
 
+@functools.lru_cache(maxsize=None)
 def _fred(sid):
+    """FRED 序列 → [(date, float)]。同一轮里 T5YIE/T10YIE/T5YIFR 利率表和通胀表都要用，
+    缓存住只下一次。"""
     return http_get("https://fred.stlouisfed.org/graph/fredgraph.csv?id=" + sid,
-                    browser_ua=False)
+                    browser_ua=False, parse=lambda raw: parse_fred_csv(raw, sid))
+
+
+def _zip(raw):
+    """xlsx 正文 → ZipFile；回来的是错误页时 BadZipFile 会让 http_get 重试。"""
+    return zipfile.ZipFile(io.BytesIO(raw))
 
 
 def fetch_real_rate():
@@ -51,7 +61,7 @@ def fetch_real_rate():
     """
     merged = {}
     for col, sid in REAL_SERIES.items():
-        for d, v in parse_fred_csv(_fred(sid), sid):
+        for d, v in _fred(sid):
             merged.setdefault(d, {"date": d})[col] = round(v, 2)
     rows = []
     for d in sorted(merged):
@@ -124,19 +134,19 @@ def fetch_inflation_expectations():
     """
     merged = {}
     for col, sid in FRED_MONTHLY_IE.items():
-        for d, v in parse_fred_csv(_fred(sid), sid):
+        for d, v in _fred(sid):
             merged.setdefault(d, {"date": d})[col] = round(v, 2)
 
     # 日频的盈亏平衡取每月最后一个有效值，好跟月频序列并排
     daily = {}
     for col, sid in (("be5y", "T5YIE"), ("be10y", "T10YIE"), ("fwd5y5y", "T5YIFR")):
-        for d, v in parse_fred_csv(_fred(sid), sid):
+        for d, v in _fred(sid):
             daily.setdefault(d[:7] + "-01", {})[col] = round(v, 2)
     for m, vals in daily.items():
         merged.setdefault(m, {"date": m}).update(vals)
 
     # 纽约联储消费者预期调查（SCE）—— 公开下载，无需授权
-    z = zipfile.ZipFile(__import__("io").BytesIO(http_get(SCE_URL)))
+    z = http_get(SCE_URL, parse=_zip)
     for sheet, cols in (("Inflation expectations", {1: "sce_1y", 2: "sce_3y"}),
                         ("Five-year ahead Infl Exp", {1: "sce_5y"})):
         for row in _sheet_rows(z, sheet):
@@ -165,7 +175,7 @@ def fetch_equity():
     series = {"sp500": "SP500", "nasdaq_comp": "NASDAQCOM", "nasdaq_100": "NASDAQ100"}
     merged = {}
     for col, sid in series.items():
-        for d, v in parse_fred_csv(_fred(sid), sid):
+        for d, v in _fred(sid):
             merged.setdefault(d, {"date": d})[col] = round(v, 2)
     rows = [merged[d] for d in sorted(merged)]
     n, added = merge_csv(os.path.join(DATA, "equity_indices.csv"),
@@ -177,8 +187,7 @@ def fetch_equity():
 # ------------------------------------------------------------------ 3. 黄金
 def fetch_gold():
     """LBMA 官方定盘价 JSON，v = [USD, GBP, EUR]，1968 年至今。"""
-    raw = http_get("https://prices.lbma.org.uk/json/gold_pm.json")
-    data = json.loads(raw.decode("utf-8"))
+    data = http_get_json("https://prices.lbma.org.uk/json/gold_pm.json", expect=list)
     rows = []
     for p in data:
         v = p.get("v") or []
@@ -205,7 +214,7 @@ def fetch_bitcoin():
         end = min(cur + datetime.timedelta(days=290), TODAY)
         url = ("https://api.exchange.coinbase.com/products/BTC-USD/candles"
                "?granularity=86400&start=%sT00:00:00Z&end=%sT00:00:00Z" % (cur, end))
-        for c in json.loads(http_get(url).decode("utf-8")):
+        for c in http_get_json(url, expect=list):
             d = datetime.datetime.fromtimestamp(
                 c[0], datetime.timezone.utc).date().isoformat()
             rows.append({"date": d, "close": round(float(c[4]), 2),
@@ -224,32 +233,48 @@ _IDX_RE = re.compile(r'"indexes\\?":\s*\\?\{(.*?)\\?\}', re.S)
 _PT_RE = re.compile(r'\\?"(\d{4}-\d{2}-\d{2})\\?":\s*\\?"([\d.]+)\\?"')
 
 
+def _gpu_page(raw):
+    """图表页 → (页面实际档位 or None, [(date, 价格)])。找不到指数块就抛错，交给 http_get 重试。"""
+    html = raw.decode("utf-8", errors="ignore")
+    m = _IDX_RE.search(html)
+    pts = _PT_RE.findall(m.group(1)) if m else []
+    if not pts:
+        raise ValueError("no index points in page")
+    # 页面对不支持双档的卡会静默回落到 neo-cloud，此处以回传的 initialMainTab 为准
+    got = re.search(r'initialMainTab\\?":\\?"([a-z\-]+)', html)
+    return (got.group(1) if got else None), pts
+
+
 def fetch_gpu():
     """Silicon Data 公开图表端点。免费层只吐**滚动 7 天**窗口，
 
     所以本地 CSV 用 append 语义：每天跑一次，历史就在仓库里自己长出来。
     没有任何 10 年历史可回补 —— 该指数 2025 年才发布。
+
+    某张卡的页面解析不出来时，其余卡照常入库，但整类仍记失败 ——
+    否则那张卡会悄无声息地停更，而错过的 7 天窗口事后补不回来。
     """
-    rows = []
+    rows, missing = [], []
     for gpu in GPUS:
         for seg in SEGMENTS[gpu]:
             url = ("https://portal.silicondata.com/gpu-index-chart"
                    "?standalone=true&gpu=%s&mainTab=%s" % (gpu, seg))
-            html = http_get(url).decode("utf-8", errors="ignore")
-            m = _IDX_RE.search(html)
-            if not m:
+            try:
+                seg_actual, pts = http_get(url, parse=_gpu_page)
+            except RuntimeError:
+                missing.append("%s/%s" % (gpu, seg))
                 continue
-            # 页面对不支持双档的卡会静默回落到 neo-cloud，此处以回传的 initialMainTab 为准
-            got = re.search(r'initialMainTab\\?":\\?"([a-z\-]+)', html)
-            seg_actual = got.group(1) if got else seg
-            for d, v in _PT_RE.findall(m.group(1)):
-                rows.append({"date": d, "gpu": gpu.upper(), "segment": seg_actual,
+            for d, v in pts:
+                rows.append({"date": d, "gpu": gpu.upper(), "segment": seg_actual or seg,
                              "usd_per_hr": v})
     if not rows:
         raise RuntimeError("silicon data: 0 points parsed")
     n, added = merge_csv(os.path.join(DATA, "gpu_rental.csv"),
                          ["date", "gpu", "segment", "usd_per_hr"],
                          ("date", "gpu", "segment"), rows)
+    if missing:
+        raise RuntimeError("silicon data: %s 解析不到数据（其余 %d 个点已入库）"
+                           % ("、".join(missing), len(rows)))
     return "gpu_rental", n, added, max(r["date"] for r in rows)
 
 
@@ -289,8 +314,8 @@ def fetch_erp():
     注意：该工作簿用的是 **1904 日期系统**，序列号要以 1904-01-01 为原点，
     否则整条序列会整体偏移 4 年多。
     """
-    raw = http_get("https://pages.stern.nyu.edu/~adamodar/pc/implprem/ERPbymonth.xlsx")
-    z = zipfile.ZipFile(__import__("io").BytesIO(raw))
+    z = http_get("https://pages.stern.nyu.edu/~adamodar/pc/implprem/ERPbymonth.xlsx",
+                 parse=_zip)
     wb = z.read("xl/workbook.xml").decode("utf-8", errors="ignore")
     epoch = (datetime.date(1904, 1, 1) if 'date1904="1"' in wb or "date1904=\"true\"" in wb
              else datetime.date(1899, 12, 30))
