@@ -11,7 +11,8 @@
     同一天的补枪 / 月度快照运行看到标记就跳过；--force 忽略标记。
   - 利率**实际与名义都播**，再带一行 10 年盈亏平衡（= 名义 − 实际），
     这样一眼能看出涨的是钱的价格还是通胀预期。
-  - 数据源有 ok:false 的放最前面；30 日变动越过阈值的单独提示：
+  - 数据源有 ok:false 的放最前面；日频序列超过一周没新点（抓取「成功」但源头冻住）
+    紧随其后；30 日变动越过阈值的单独提示：
     实际/名义利率 ±10bp、股指 ±2%、黄金 ±2%、BTC ±5%。
   - 发送失败以非零退出，让 Actions 把它标红。
 """
@@ -81,6 +82,14 @@ def compose(dash, report, build_failed):
         lines.append("看板数据文件缺失，云端状态未知")
         lines.append(DASHBOARD_URL)
         return "\n".join(lines)
+
+    stale = {}
+    for x in dash["kpis"]:
+        if x.get("stale_days"):
+            stale.setdefault(x["date"], []).append(x["name"])
+    if stale:
+        lines.append("⚠ 超过一周没有新数据：" + "；".join(
+            "%s 停在 %s" % ("、".join(v), d[5:]) for d, v in sorted(stale.items())))
 
     k = {x["name"]: x for x in dash["kpis"]}
 

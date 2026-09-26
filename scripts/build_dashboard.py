@@ -120,13 +120,19 @@ def build():
         return out
 
     fms_month = fms[-1]["month"] if fms else None
-    # 本类由本机按月同步（云端读不到私有存档），超期就在面板上讲明白，别让人误读成最新
+    # 超期就在面板上讲明白，别让人误读成最新。FMS 每月中旬的周二发布，相邻两期最多隔约
+    # 5 周，定时任务 16~24 号上网抓。所以按**上一期发布日**算、超过 40 天才报 —— 按月初算
+    # 45 天的话，每逢第三个周二才发布的月份，16 号起就会误报好几天。
     fms_stale = ""
     if fms_month:
-        age = (TODAY - datetime.date.fromisoformat(fms_month + "-01")).days
-        if age > 45:
-            fms_stale = ("　⚠️ 最新一期为 %s，距今 %d 天，本机月度同步可能没跑成。"
-                         % (fms_month, age))
+        try:
+            last = datetime.date.fromisoformat(fms[-1].get("release_date") or "")
+        except ValueError:                           # 缺发布日（或格式不对）按月中估
+            last = datetime.date.fromisoformat(fms_month + "-15")
+        age = (TODAY - last).days
+        if age > 40:
+            fms_stale = ("　⚠️ 最新一期为 %s，距上期发布已 %d 天，"
+                         "月度抓取（macro5-fms-monthly）可能没跑成。" % (fms_month, age))
     else:
         fms_stale = "　⚠️ 尚未同步到任何一期数据。"
     fms_tables = []
@@ -173,36 +179,45 @@ def build():
         p_norm["series"][part["label"]] = [m.get(d) for d in all_dates]
 
     kpis = []
+    # 日频序列超过一周没有新点就标「停更」。抓取「成功」但源头冻住（或被悄悄改版）时
+    # fetch_report 全绿，只有看日期才发现得了。正常滞后最多 5 天左右
+    # （FRED H.15 次日才发 + 周末 + 假日）。
+    STALE_DAYS = 7
 
-    def add_kpi(name, unit, p, label, note, is_rate=False):
+    def add_kpi(name, unit, p, label, note, is_rate=False, daily=False):
         d, v = last_valid(p, label)
         if v is None:
             return
-        d1, pct1 = change(p, label, 1 if not is_rate else 7)
         d30, pct30 = change(p, label, 30)
         d365, pct365 = change(p, label, 365)
-        kpis.append({"name": name, "unit": unit, "date": d, "value": v, "note": note,
-                     "is_rate": is_rate,
-                     "chg_30": d30 if is_rate else pct30,
-                     "chg_365": d365 if is_rate else pct365})
+        k = {"name": name, "unit": unit, "date": d, "value": v, "note": note,
+             "is_rate": is_rate,
+             "chg_30": d30 if is_rate else pct30,
+             "chg_365": d365 if is_rate else pct365}
+        age = (TODAY - datetime.date.fromisoformat(d)).days
+        if daily and age > STALE_DAYS:
+            k["stale_days"] = age
+        kpis.append(k)
 
-    add_kpi("30年期实际利率", "%", p_rr, "30年期实际利率", "FRED DFII30 · 日频", True)
-    add_kpi("30年期名义利率", "%", p_rr, "30年期名义利率", "FRED DGS30 · 日频", True)
-    add_kpi("10年期实际利率", "%", p_rr, "10年期实际利率", "FRED DFII10 · 日频", True)
-    add_kpi("10年期名义利率", "%", p_rr, "10年期名义利率", "FRED DGS10 · 日频", True)
-    add_kpi("5年期实际利率", "%", p_rr, "5年期实际利率", "FRED DFII5 · 日频", True)
-    add_kpi("5年期名义利率", "%", p_rr, "5年期名义利率", "FRED DGS5 · 日频", True)
+    add_kpi("30年期实际利率", "%", p_rr, "30年期实际利率", "FRED DFII30 · 日频", True, True)
+    add_kpi("30年期名义利率", "%", p_rr, "30年期名义利率", "FRED DGS30 · 日频", True, True)
+    add_kpi("10年期实际利率", "%", p_rr, "10年期实际利率", "FRED DFII10 · 日频", True, True)
+    add_kpi("10年期名义利率", "%", p_rr, "10年期名义利率", "FRED DGS10 · 日频", True, True)
+    add_kpi("5年期实际利率", "%", p_rr, "5年期实际利率", "FRED DFII5 · 日频", True, True)
+    add_kpi("5年期名义利率", "%", p_rr, "5年期名义利率", "FRED DGS5 · 日频", True, True)
     add_kpi("市场通胀预期(10年)", "%", p_ie, "市场 · 10年盈亏平衡", "FRED T10YIE · 月末", True)
     add_kpi("消费者通胀预期(5年)", "%", p_ie, "消费者 · 纽约联储5年",
             "纽约联储 SCE 中位数 · 月频", True)
     add_kpi("隐含股权风险溢价", "%", p_erp, "隐含股权风险溢价", "Damodaran · 月频", True)
-    add_kpi("标普500", "", p_eq, "标普500", "FRED SP500 · 日频")
-    add_kpi("纳斯达克综合", "", p_eq, "纳斯达克综合", "FRED NASDAQCOM · 日频")
-    add_kpi("伦敦金", "美元/盎司", p_gold, "伦敦金 (美元/盎司)", "LBMA 定盘价 · 日频")
-    add_kpi("比特币", "美元", p_btc, "比特币 (美元)", "Coinbase 收盘 · 日频")
+    add_kpi("标普500", "", p_eq, "标普500", "FRED SP500 · 日频", daily=True)
+    add_kpi("纳斯达克综合", "", p_eq, "纳斯达克综合", "FRED NASDAQCOM · 日频", daily=True)
+    add_kpi("伦敦金", "美元/盎司", p_gold, "伦敦金 (美元/盎司)", "LBMA 定盘价 · 日频",
+            daily=True)
+    add_kpi("比特币", "美元", p_btc, "比特币 (美元)", "Coinbase 收盘 · 日频", daily=True)
+    # GPU 是价格（美元/小时）不是利率，变动按百分比算 —— 按 pp 算会把 +0.22 美元写成「+0.22pp」
     for lab in sorted(p_gpu["series"]):
         if lab.startswith("H100") or lab.startswith("B200"):
-            add_kpi("GPU " + lab, "美元/小时", p_gpu, lab, "Silicon Data · 日频", True)
+            add_kpi("GPU " + lab, "美元/小时", p_gpu, lab, "Silicon Data · 日频", daily=True)
     add_kpi("FMS 现金水位", "%", p_fms, "现金水位 %", "美银基金经理调查 · 月频", True)
     add_kpi("FMS 头号拥挤交易", "%", p_fms, "头号拥挤交易 拥挤度 %",
             (fms[-1]["top_crowded_trade"] if fms else "") + " · 月频", True)
@@ -290,8 +305,9 @@ def write_summary(d):
             if x is None:
                 return "—"
             return ("%+.2f pp" % x) if k["is_rate"] else ("%+.1f%%" % x)
+        date = k["date"] + (" ⚠ %d 天没更新" % k["stale_days"] if k.get("stale_days") else "")
         lines.append("| %s | %s | %s | %s | %s |"
-                     % (k["name"], val, k["date"], fmt(k["chg_30"]), fmt(k["chg_365"])))
+                     % (k["name"], val, date, fmt(k["chg_30"]), fmt(k["chg_365"])))
     lines += ["", "## 数据覆盖", "",
               "| 模块 | 频率 | 起点 | 最新 | 点数 |", "|---|---|---|---|---:|"]
     for key, p in d["panels"].items():
