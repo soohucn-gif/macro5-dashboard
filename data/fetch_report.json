@@ -1,14 +1,14 @@
 {
-  "run_at_utc": "2026-09-29T05:42:08+00:00",
+  "run_at_utc": "2026-09-30T01:17:21+00:00",
   "full": false,
   "jobs": [
     {
       "job": "real_rates",
       "label": "实际利率期限结构",
       "ok": true,
-      "rows": 16170,
-      "added": 0,
-      "last_date": "2026-09-28"
+      "rows": 16171,
+      "added": 1,
+      "last_date": "2026-09-29"
     },
     {
       "job": "inflation_expectations",
@@ -22,33 +22,33 @@
       "job": "equity_indices",
       "label": "股指",
       "ok": true,
-      "rows": 14031,
-      "added": 0,
-      "last_date": "2026-09-28"
+      "rows": 14032,
+      "added": 1,
+      "last_date": "2026-09-29"
     },
     {
       "job": "gold",
       "label": "黄金",
       "ok": true,
-      "rows": 14692,
-      "added": 0,
-      "last_date": "2026-09-28"
+      "rows": 14693,
+      "added": 1,
+      "last_date": "2026-09-29"
     },
     {
       "job": "bitcoin",
       "label": "比特币",
       "ok": true,
-      "rows": 4090,
-      "added": 0,
-      "last_date": "2026-09-29"
+      "rows": 4091,
+      "added": 1,
+      "last_date": "2026-09-30"
     },
     {
       "job": "gpu_rental",
       "label": "GPU租赁指数",
       "ok": true,
-      "rows": 259,
-      "added": 0,
-      "last_date": "2026-09-28"
+      "rows": 266,
+      "added": 7,
+      "last_date": "2026-09-29"
     },
     {
       "job": "erp_monthly",
