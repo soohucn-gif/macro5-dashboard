@@ -1,5 +1,5 @@
 {
-  "run_at_utc": "2026-10-02T05:34:47+00:00",
+  "run_at_utc": "2026-10-02T17:54:56+00:00",
   "full": false,
   "jobs": [
     {
@@ -44,9 +44,9 @@
       "job": "gpu_rental",
       "label": "GPU租赁指数",
       "ok": true,
-      "rows": 275,
-      "added": 0,
-      "last_date": "2026-10-01"
+      "rows": 287,
+      "added": 12,
+      "last_date": "2026-10-02"
     },
     {
       "job": "erp_monthly",
