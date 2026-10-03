@@ -1,5 +1,5 @@
 {
-  "run_at_utc": "2026-10-03T01:11:27+00:00",
+  "run_at_utc": "2026-10-03T05:16:46+00:00",
   "full": false,
   "jobs": [
     {
@@ -7,7 +7,7 @@
       "label": "实际利率期限结构",
       "ok": true,
       "rows": 16174,
-      "added": 1,
+      "added": 0,
       "last_date": "2026-10-02"
     },
     {
@@ -23,7 +23,7 @@
       "label": "股指",
       "ok": true,
       "rows": 14035,
-      "added": 1,
+      "added": 0,
       "last_date": "2026-10-02"
     },
     {
@@ -37,7 +37,7 @@
       "label": "比特币",
       "ok": true,
       "rows": 4094,
-      "added": 1,
+      "added": 0,
       "last_date": "2026-10-03"
     },
     {
