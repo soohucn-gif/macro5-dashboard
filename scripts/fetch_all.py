@@ -5,7 +5,7 @@
   data/real_rates.csv      5/10/30年期实际利率(TIPS)与名义利率      日频  FRED
   data/inflation_expectations.csv  通胀预期：市场 vs 消费者         月频  FRED + 纽约联储
   data/equity_indices.csv  标普500 / 纳指综合 / 纳指100             日频  FRED
-  data/gold.csv            LBMA 伦敦金定盘价 USD/oz                 日频  LBMA
+  data/gold.csv            LBMA 伦敦金定盘价 USD/oz（主）/ gold-api.com XAU现货（备）  日频
   data/bitcoin.csv         BTC-USD 日收盘                           日频  Coinbase
   data/gpu_rental.csv      H100/H200/A100/B200/MI300X 租赁指数      日频  Silicon Data
   data/erp_monthly.csv     Damodaran 隐含股权风险溢价               月频  NYU Stern
@@ -185,18 +185,50 @@ def fetch_equity():
 
 
 # ------------------------------------------------------------------ 3. 黄金
+def _gold_fallback():
+    """备用：gold-api.com 免费 XAU/USD 现货价（无需 key）。
+
+    LBMA 主源被 Cloudflare 拦截时用。返回 [(date, usd_per_oz)]。
+    注意这是抓取时刻的现货价，不是 LBMA 下午定盘价 —— 语义上记为备用源，
+    上游调用方会在飞书推送里标出来。
+    """
+    d = http_get_json("https://api.gold-api.com/price/XAU", browser_ua=False)
+    px = d.get("price")
+    if not px:
+        raise ValueError("gold-api.com: 响应里没有 price 字段")
+    # updatedAt 如 "2026-10-01T04:49:19Z"，取日期部分；拿不到就用今天
+    ts = str(d.get("updatedAt") or "")
+    date = ts[:10] if len(ts) >= 10 and ts[4] == "-" and ts[7] == "-" else TODAY.isoformat()
+    return [(date, round(float(px), 2))]
+
+
 def fetch_gold():
-    """LBMA 官方定盘价 JSON，v = [USD, GBP, EUR]，1968 年至今。"""
-    data = http_get_json("https://prices.lbma.org.uk/json/gold_pm.json", expect=list)
-    rows = []
-    for p in data:
-        v = p.get("v") or []
-        if not v or v[0] in (None, ""):
-            continue
-        rows.append({"date": p["d"], "usd_per_oz": round(float(v[0]), 2)})
+    """LBMA 官方定盘价 JSON（主源），v = [USD, GBP, EUR]，1968 年至今。
+
+    2026-10-01 起 LBMA 对 GitHub Runner IP 回 403（Cloudflare 拦截），
+    主源失败时自动降级到 gold-api.com 免费 XAU 现货价。实际用的源放在
+    返回的第 5 个元素里，进 fetch_report.json 的 source 字段，飞书推送里
+    会把备用源标出来。
+    """
+    try:
+        data = http_get_json("https://prices.lbma.org.uk/json/gold_pm.json", expect=list)
+        rows = []
+        for p in data:
+            v = p.get("v") or []
+            if not v or v[0] in (None, ""):
+                continue
+            rows.append({"date": p["d"], "usd_per_oz": round(float(v[0]), 2)})
+        if not rows:
+            raise ValueError("LBMA: 0 rows parsed")
+        source = "LBMA"
+    except Exception as e:                        # noqa: BLE001 — 主源挂了就降级
+        print("[warn] gold: LBMA 失败（%s: %s），降级到 gold-api.com 备用源"
+              % (type(e).__name__, e), file=sys.stderr, flush=True)
+        rows = [{"date": d, "usd_per_oz": v} for d, v in _gold_fallback()]
+        source = "gold-api.com（备用）"
     n, added = merge_csv(os.path.join(DATA, "gold.csv"),
                          ["date", "usd_per_oz"], ("date",), rows)
-    return "gold", n, added, rows[-1]["date"] if rows else ""
+    return "gold", n, added, rows[-1]["date"] if rows else "", source
 
 
 # ---------------------------------------------------------------- 4. 比特币
@@ -392,11 +424,17 @@ def main():
     report, failed = [], []
     for label, fn in JOBS:
         try:
-            name, total, added, last = fn()
-            report.append({"job": name, "label": label, "ok": True, "rows": total,
-                           "added": added, "last_date": last})
-            print("[ok]   %-14s %-22s rows=%-6d new=%-4d last=%s"
-                  % (name, label, total, added, last), flush=True)
+            res = fn()
+            name, total, added, last = res[:4]
+            entry = {"job": name, "label": label, "ok": True, "rows": total,
+                     "added": added, "last_date": last}
+            src = res[4] if len(res) > 4 and res[4] else ""
+            if src:
+                entry["source"] = src
+            report.append(entry)
+            print("[ok]   %-14s %-22s rows=%-6d new=%-4d last=%s%s"
+                  % (name, label, total, added, last,
+                     "  [源:%s]" % src if src else ""), flush=True)
         except Exception as e:                        # noqa: BLE001
             failed.append(label)
             report.append({"job": fn.__name__, "label": label, "ok": False,

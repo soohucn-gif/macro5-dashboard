@@ -71,12 +71,18 @@ def compose(dash, report, build_failed):
     lines = ["五大类看板 %s" % today]
 
     bad = []
+    gold_fallback = False
     if report:
         bad = [j["label"] for j in report.get("jobs", []) if not j.get("ok")]
+        gold_fallback = any(j.get("job") in ("gold", "fetch_gold") and j.get("ok")
+                            and "备用" in str(j.get("source", ""))
+                            for j in report.get("jobs", []))
     if build_failed:
         lines.append("❌ 今日构建失败，以下为上次快照")
     if bad:
         lines.append("❌ 抓取失败：" + "、".join(bad))
+    if gold_fallback:
+        lines.append("⚠ 黄金走备用源（LBMA 被拦截），为抓取时刻现货价非定盘价")
 
     if not dash:
         lines.append("看板数据文件缺失，云端状态未知")
