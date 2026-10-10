@@ -83,10 +83,34 @@ FRED_MONTHLY_IE = {"be30y": "T30YIEM", "cleveland_1y": "EXPINF1YR",
                    "cleveland_30y": "EXPINF30YR", "michigan_1y": "MICH"}
 SCE_URL = ("https://www.newyorkfed.org/medialibrary/interactives/sce/sce/"
            "downloads/data/FRBNY-SCE-Data.xlsx")
+# 2026-10 纽约联储删掉了独立工作表「Five-year ahead Infl Exp」，把五年中位数
+# 并进 Inflation expectations。表头原文如下；它左边紧挨着一列空列，不能写死列号。
+SCE_FIVE_YEAR_HEADER = "Median five-year ahead expected inflation rate"
+SCE_FIVE_YEAR_SHEET = "Five-year ahead Infl Exp"
 
 
-def _sheet_rows(z, sheet_name):
-    """从 xlsx 里按表名取出二维字符串数组（共享字符串已解引用）。"""
+def _norm_header(v):
+    return " ".join(str(v).replace("\n", " ").split()).lower()
+
+
+def _is_five_year_median_header(v):
+    """认五年期中位数预期列，排除分位数、点预测和人口分组表头。"""
+    s = _norm_header(v)
+    if not s:
+        return False
+    if s == _norm_header(SCE_FIVE_YEAR_HEADER):
+        return True
+    if not s.startswith("median five-year ahead expected"):
+        return False
+    return not any(w in s for w in ("percentile", "point", "uncertainty", "demographic"))
+
+
+def _sheet_rows(z, sheet_name, required=True):
+    """从 xlsx 里按表名取出按列对齐的二维字符串数组（共享字符串已解引用）。
+
+    单元格按 r 属性落列，缺的列补空串，避免前导空单元格把后面的字段挤偏。
+    工作表不存在时：required=False 返回 None，否则抛 RuntimeError。
+    """
     wb = z.read("xl/workbook.xml").decode("utf-8", errors="ignore")
     rels = dict(re.findall(r'Id="(rId\d+)"[^>]*Target="([^"]+)"',
                            z.read("xl/_rels/workbook.xml.rels").decode("utf-8", "ignore")))
@@ -94,6 +118,8 @@ def _sheet_rows(z, sheet_name):
                 re.findall(r'<sheet name="([^"]+)"[^>]*r:id="(rId\d+)"', wb)
                 if n == sheet_name), None)
     if tgt is None:
+        if not required:
+            return None
         raise RuntimeError("xlsx 里找不到工作表 %r" % sheet_name)
     shared = []
     if "xl/sharedStrings.xml" in z.namelist():
@@ -102,15 +128,34 @@ def _sheet_rows(z, sheet_name):
     path = "xl/" + tgt.lstrip("/").replace("xl/", "", 1)
     out = []
     for row in ET.fromstring(z.read(path)).find(NS + "sheetData").findall(NS + "row"):
-        cells = []
+        by_col = {}
         for c in row.findall(NS + "c"):
+            col = _col_num(c.get("r") or "") - 1
+            if col < 0:
+                continue
             v = c.find(NS + "v")
             if v is None or v.text is None:
-                cells.append("")
+                val = ""
             else:
-                cells.append(shared[int(v.text)] if c.get("t") == "s" else v.text)
-        out.append(cells)
+                val = shared[int(v.text)] if c.get("t") == "s" else v.text
+            by_col[col] = val
+        if not by_col:
+            out.append([])
+            continue
+        dense = [""] * (max(by_col) + 1)
+        for i, val in by_col.items():
+            dense[i] = val
+        out.append(dense)
     return out
+
+
+def _header_col(rows, pred, scan=20):
+    """在表头区域找第一列满足 pred 的 0-based 列号，找不到返回 None。"""
+    for row in rows[:scan]:
+        for idx, val in enumerate(row):
+            if pred(val):
+                return idx
+    return None
 
 
 def _ym(v):
@@ -145,20 +190,14 @@ def fetch_inflation_expectations():
     for m, vals in daily.items():
         merged.setdefault(m, {"date": m}).update(vals)
 
-    # 纽约联储消费者预期调查（SCE）—— 公开下载，无需授权
+    # 纽约联储消费者预期调查（SCE）—— 公开下载，无需授权。
+    # 1y/3y 仍在 Inflation expectations 的第 2、3 列（0-based 1、2）。
+    # 5y 优先读同一张表上的五年中位数列；该列为空的月份留空，不拿别的列补。
+    # 旧表名如果重新出现，只在新列找不到时才用，缺表不再让整类失败。
     z = http_get(SCE_URL, parse=_zip)
-    for sheet, cols in (("Inflation expectations", {1: "sce_1y", 2: "sce_3y"}),
-                        ("Five-year ahead Infl Exp", {1: "sce_5y"})):
-        for row in _sheet_rows(z, sheet):
-            d = _ym(row[0] if row else "")
-            if d is None:
-                continue
-            for idx, col in cols.items():
-                if idx < len(row) and row[idx] not in ("", None):
-                    try:
-                        merged.setdefault(d, {"date": d})[col] = round(float(row[idx]), 2)
-                    except ValueError:
-                        pass
+    ie = _sheet_rows(z, "Inflation expectations")
+    _fill_sce(merged, ie, {1: "sce_1y", 2: "sce_3y"})
+    note = _fill_sce_5y(z, ie, merged)
 
     rows = [merged[d] for d in sorted(merged)]
     fields = ["date", "be5y", "be10y", "be30y", "fwd5y5y",
@@ -166,7 +205,60 @@ def fetch_inflation_expectations():
               "michigan_1y", "sce_1y", "sce_3y", "sce_5y"]
     n, added = merge_csv(os.path.join(DATA, "inflation_expectations.csv"),
                          fields, ("date",), rows)
-    return "inflation_expectations", n, added, rows[-1]["date"] if rows else ""
+    last = rows[-1]["date"] if rows else ""
+    if note:
+        return "inflation_expectations", n, added, last, note
+    return "inflation_expectations", n, added, last
+
+
+def _fill_sce(merged, rows, cols):
+    """把 SCE 表里指定列写进 merged。空单元格跳过，留给 merge 写成空。"""
+    for row in rows:
+        d = _ym(row[0] if row else "")
+        if d is None:
+            continue
+        for idx, col in cols.items():
+            if idx >= len(row) or row[idx] in ("", None):
+                continue
+            try:
+                merged.setdefault(d, {"date": d})[col] = round(float(row[idx]), 2)
+            except ValueError:
+                pass
+
+
+def _fill_sce_5y(z, ie_rows, merged):
+    """写入 sce_5y。成功读到新列时返回空串；只能走旧表或两处都没有时返回说明。
+
+    新列、旧表都不在时保留 CSV 里已有的 sce_5y，避免 merge 把历史整列抹掉。
+    """
+    col = _header_col(ie_rows, _is_five_year_median_header)
+    if col is not None:
+        _fill_sce(merged, ie_rows, {col: "sce_5y"})
+        return ""
+    old = _sheet_rows(z, SCE_FIVE_YEAR_SHEET, required=False)
+    if old is not None:
+        legacy_col = _header_col(old, _is_five_year_median_header)
+        if legacy_col is None:
+            legacy_col = 1
+        _fill_sce(merged, old, {legacy_col: "sce_5y"})
+        return "sce_5y 来自旧表 %s" % SCE_FIVE_YEAR_SHEET
+    _keep_existing_sce_5y(merged)
+    return "sce_5y 未更新（Inflation expectations 无五年中位数列，旧表也不在）"
+
+
+def _keep_existing_sce_5y(merged):
+    """新源没有五年列时，把 CSV 里已有的 sce_5y 抄回 merged，防止被空值覆盖。"""
+    for r in read_csv(os.path.join(DATA, "inflation_expectations.csv")):
+        d = (r.get("date") or "").strip()
+        v = (r.get("sce_5y") or "").strip()
+        if not d or not v:
+            continue
+        slot = merged.setdefault(d, {"date": d})
+        if slot.get("sce_5y") in (None, ""):
+            try:
+                slot["sce_5y"] = round(float(v), 2)
+            except ValueError:
+                slot["sce_5y"] = v
 
 
 # ------------------------------------------------------------------ 2. 股指
