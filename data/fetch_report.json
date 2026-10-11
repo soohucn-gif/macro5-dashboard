@@ -1,5 +1,5 @@
 {
-  "run_at_utc": "2026-10-11T01:00:20+00:00",
+  "run_at_utc": "2026-10-11T05:44:15+00:00",
   "full": false,
   "jobs": [
     {
@@ -11,10 +11,12 @@
       "last_date": "2026-10-09"
     },
     {
-      "job": "fetch_inflation_expectations",
+      "job": "inflation_expectations",
       "label": "通胀预期",
-      "ok": false,
-      "error": "RuntimeError: xlsx 里找不到工作表 'Five-year ahead Infl Exp'"
+      "ok": true,
+      "rows": 586,
+      "added": 0,
+      "last_date": "2026-10-01"
     },
     {
       "job": "equity_indices",
@@ -29,7 +31,7 @@
       "label": "黄金",
       "ok": true,
       "rows": 14698,
-      "added": 1,
+      "added": 0,
       "last_date": "2026-10-11",
       "source": "gold-api.com（备用）"
     },
@@ -38,7 +40,7 @@
       "label": "比特币",
       "ok": true,
       "rows": 4102,
-      "added": 1,
+      "added": 0,
       "last_date": "2026-10-11"
     },
     {
@@ -46,7 +48,7 @@
       "label": "GPU租赁指数",
       "ok": true,
       "rows": 343,
-      "added": 7,
+      "added": 0,
       "last_date": "2026-10-10"
     },
     {
