@@ -11,10 +11,8 @@
     同一天的补枪 / 月度快照运行看到标记就跳过；--force 忽略标记。
   - 利率**实际与名义都播**，再带一行 10 年盈亏平衡（= 名义 − 实际），
     这样一眼能看出涨的是钱的价格还是通胀预期。
-  - ERP 必须播**三件套**（月度分位 / 65 年分位 / ERP÷无风险利率分位）。
-    2026-10 就是反例：ERP 3.70% 月度分位 0%（2008 以来最低），
-    但 65 年分位 40%、比值分位 49%。只播一个数会把「利率抬升」
-    误读成「风险偏好极端」。
+  - ERP 播绝对值 + **2008-09 起的月度分位**，并标明起点年月 ——
+    这段历史只有 18 年且起点就是雷曼，分位低不等于「极端乐观」。
   - 数据源有 ok:false 的放最前面；日频序列超过一周没新点（抓取「成功」但源头冻住）
     紧随其后；30 日变动越过阈值的单独提示：
     实际/名义利率 ±10bp、股指 ±2%、黄金 ±2%、BTC ±5%。
@@ -123,11 +121,9 @@ def compose(dash, report, build_failed):
     erp = g("隐含股权风险溢价")
     ep = dash.get("erp_pctiles")
     if ep and ep.get("p_monthly") is not None:
-        seg = "ERP %.2f%% 分位 月%d%% / 65年%d%%" % (ep["erp"], ep["p_monthly"],
-                                                     ep["p_annual"])
-        if ep.get("ratio") is not None and ep.get("p_ratio") is not None:
-            seg += " / ÷rf %.2f→%d%%" % (ep["ratio"], ep["p_ratio"])
-        lines.append("%s  (%s)" % (seg, (ep.get("month") or "")[:7]))
+        lines.append("ERP %.2f%% 月度分位%d%%（%s起）  (%s)"
+                     % (ep["erp"], ep["p_monthly"], ep.get("span_from", "2008-09"),
+                        (ep.get("month") or "")[:7]))
     elif erp:
         lines.append("ERP %.2f%%  (%s)" % (erp["value"], erp["date"][:7]))
     spx, ndx = g("标普500"), g("纳斯达克综合")
