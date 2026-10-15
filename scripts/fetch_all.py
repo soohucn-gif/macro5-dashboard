@@ -498,17 +498,98 @@ def fetch_erp():
         rows.append(rec)
     if not rows:
         raise RuntimeError("ERPbymonth.xlsx: 0 rows parsed")
-    fields = ["date", "erp_t12m", "tbond_rate", "expected_return", "sp500",
+    # ERP ÷ 无风险利率：绝对值在不同利率环境下不可比，这个比值才可比。
+    # 2026-10 就是例子 —— ERP 3.70% 是 2008 以来最低（月度分位 0%），
+    # 但比值 0.70 在 65 年里只是中位附近（分位 49%），差别全在 10Y 从 0.5% 到 5.3%。
+    for r in rows:
+        tb = r.get("tbond_rate")
+        r["erp_over_rf"] = (round(r["erp_t12m"] / tb, 4)
+                            if (tb and r.get("erp_t12m") not in (None, "")) else "")
+    fields = ["date", "erp_t12m", "tbond_rate", "expected_return", "erp_over_rf", "sp500",
               "erp_sustainable_payout", "erp_adj_rf"]
     n, added = merge_csv(os.path.join(DATA, "erp_monthly.csv"), fields, ("date",), rows)
     return "erp_monthly", n, added, rows[-1]["date"]
+
+
+# --------------------------------- 6b. 年度隐含 ERP (FCFE)，1961 至今 65 年
+# 月度表只回到 2008-09，不够判断"现在算不算极端"。年度表给的是跨越
+# 1970s 滞胀、1999 泡沫、2008 危机、2020 零利率的完整分布。
+# 两条序列口径不同（月度 T12m vs 年度 FCFE），重叠 18 年里 15 年吻合，
+# 2011/2012/2020 分别差 131/22/52bp —— 所以分别落盘，年度只作量级校准。
+def _num_pct(x):
+    """'4.06%' / '0.0406' / 4.06e-2 都收，返回小数。解析不了返回 None。"""
+    if x in (None, ""):
+        return None
+    t = str(x).strip().replace(",", ".")
+    pct = t.endswith("%")
+    try:
+        f = float(t.rstrip("%"))
+    except ValueError:
+        return None
+    return f / 100.0 if pct else f
+
+
+ANNUAL_URL = "https://pages.stern.nyu.edu/~adamodar/pc/datasets/histimpl.xlsx"
+ANNUAL_SHEET = "Historical Impl Premiums"
+# 『Historical Impl Premiums』列号（0-indexed）
+ACOL = {0: "year", 1: "earnings_yield", 2: "dividend_yield", 3: "sp500",
+        10: "tbond_rate", 12: "smoothed_growth", 15: "erp_fcfe",
+        17: "erp_sustainable_payout", 18: "erp_over_rf_src"}
+
+
+def fetch_erp_annual():
+    """Damodaran 年度 Implied ERP (FCFE)。
+
+    官网同时挂 .xls 与 .xlsx，内容一致（65 年逐年比对零偏差），这里取 .xlsx
+    以便继续用标准库 zipfile 解析，不引 xlrd。
+    """
+    raw = http_get(ANNUAL_URL)
+    z = zipfile.ZipFile(__import__("io").BytesIO(raw))
+    sheet = _sheet_rows(z, ANNUAL_SHEET)
+    rows = []
+    for row in sheet:
+        if not row:
+            continue
+
+        def cell(idx):
+            return row[idx] if idx < len(row) else ""
+        y = _num_pct(cell(0))
+        if y is None or not (1950 < y < 2100):
+            continue
+        erp = _num_pct(cell(15))
+        if erp is None:                       # 最后一年有时只有表头没有数
+            continue
+        rec = {"year": int(y)}
+        for c, k in ACOL.items():
+            if k == "year":
+                continue
+            v = _num_pct(cell(c))
+            rec[k] = round(v, 6) if v is not None else ""
+        tb = rec.get("tbond_rate")
+        rec["erp_over_rf"] = round(erp / tb, 4) if tb else ""
+        rows.append(rec)
+    if len(rows) < 50:
+        raise RuntimeError("histimpl.xlsx 只解析出 %d 年，像是表结构变了" % len(rows))
+    rows.sort(key=lambda r: r["year"])
+    # 自校验：用他自己的 ERP/Riskfree 列对账，偏差 >0.02 说明列号读错了
+    chk = [(r["year"], r["erp_over_rf"], r["erp_over_rf_src"]) for r in rows
+           if r["erp_over_rf"] != "" and r["erp_over_rf_src"] != ""]
+    bad = [y for y, a, b in chk if abs(a - b) > 0.02]
+    if bad:
+        raise RuntimeError("年度 ERP/无风险利率自校验失败，%d 年对不上：%s"
+                           % (len(bad), bad[:5]))
+    fields = ["year", "erp_fcfe", "tbond_rate", "erp_over_rf", "erp_over_rf_src",
+              "erp_sustainable_payout", "earnings_yield", "dividend_yield",
+              "smoothed_growth", "sp500"]
+    n, added = merge_csv(os.path.join(DATA, "erp_annual.csv"), fields, ("year",), rows)
+    return "erp_annual", n, added, str(rows[-1]["year"])
 
 
 # ------------------------------------------------------------------- 主流程
 JOBS = [("实际利率期限结构", fetch_real_rate),
         ("通胀预期", fetch_inflation_expectations), ("股指", fetch_equity),
         ("黄金", fetch_gold), ("比特币", fetch_bitcoin),
-        ("GPU租赁指数", fetch_gpu), ("隐含股权风险溢价", fetch_erp)]
+        ("GPU租赁指数", fetch_gpu), ("隐含股权风险溢价", fetch_erp), ("年度ERP(65年)", fetch_erp_annual)]
 
 
 def main():

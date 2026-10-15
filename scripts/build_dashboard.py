@@ -71,6 +71,7 @@ def build():
     gold = read_csv(os.path.join(DATA, "gold.csv"))
     btc = read_csv(os.path.join(DATA, "bitcoin.csv"))
     erp = read_csv(os.path.join(DATA, "erp_monthly.csv"))
+    erpa = read_csv(os.path.join(DATA, "erp_annual.csv"))
     gpu_rows = read_csv(os.path.join(DATA, "gpu_rental.csv"))
     fms = read_csv(os.path.join(DATA, "bofa_fms.csv"))
     fms_crowded = read_csv(os.path.join(DATA, "bofa_fms_crowded.csv"))
@@ -90,6 +91,66 @@ def build():
     p_btc = panel(btc, {"close": "比特币 (美元)"})
     p_erp = panel(erp, {"erp_t12m": "隐含股权风险溢价", "expected_return": "隐含预期收益率",
                         "tbond_rate": "10年期美债收益率"}, date_from="2008-09-01")
+
+    # ===== ERP 三件套（2026-10-15 与用户确认的汇报口径）=====
+    # 只看月度分位会把「利率抬升」误读成「风险偏好极端」：2026-10 的 ERP 3.70%
+    # 是 2008 年以来最低（月度分位 0%），但放进 65 年年度分布只是 40% 分位，
+    # 除以无风险利率后的比值 0.70 更只有 49% 分位。三个口径必须一起看。
+    def pctile(series, cur):
+        s_ = sorted(series)
+        return round(sum(1 for v in s_ if v < cur) / len(s_) * 100) if s_ else None
+
+    erp_cur = erp[-1] if erp else {}
+    m_erp = [f(r["erp_t12m"]) for r in erp if f(r["erp_t12m"]) is not None]
+    m_er = [f(r["expected_return"]) for r in erp if f(r["expected_return"]) is not None]
+    m_tb = [f(r["tbond_rate"]) for r in erp if f(r["tbond_rate"]) is not None]
+    a_erp = [f(r["erp_fcfe"]) * 100 for r in erpa if f(r["erp_fcfe"]) is not None]
+    a_ratio = [f(r["erp_over_rf"]) for r in erpa if f(r["erp_over_rf"]) is not None]
+    cur_erp, cur_ratio = f(erp_cur.get("erp_t12m")), f(erp_cur.get("erp_over_rf"))
+
+    erp_tables = []
+    if cur_erp is not None and a_erp and a_ratio:
+        yr0, yr1 = erpa[0]["year"], erpa[-1]["year"]
+        erp_tables = [
+            {"title": "三件套分位", "note": "同一个当前值，放进三种分布里看。"
+                                           "分位越高＝相对历史越便宜（补偿越厚）。"
+                                           "条长按 0–100% 绝对刻度画。",
+             "scale": 100,
+             "items": [
+                 {"label": "月度 ERP (T12m) %.2f%%" % cur_erp,
+                  "en": "2008-09 至今 · %d 个月" % len(m_erp),
+                  "pct": pctile(m_erp, cur_erp)},
+                 {"label": "年度 ERP (FCFE) %.2f%%" % cur_erp,
+                  "en": "%s–%s · 65 年，口径为 FCFE，只作量级校准" % (yr0, yr1),
+                  "pct": pctile(a_erp, cur_erp)},
+                 {"label": "ERP ÷ 无风险利率 %.2f" % cur_ratio
+                  if cur_ratio is not None else "ERP ÷ 无风险利率 —",
+                  "en": "%s–%s · 65 年，跨利率环境校准" % (yr0, yr1),
+                  "pct": pctile(a_ratio, cur_ratio) if cur_ratio is not None else None},
+             ]},
+            {"title": "配套分位（月度口径）", "note": "拆开看是哪一半在动。",
+             "scale": 100,
+             "items": [
+                 {"label": "隐含预期收益率 r %.2f%%" % m_er[-1],
+                  "en": "r = 无风险利率 + ERP", "pct": pctile(m_er, m_er[-1])},
+                 {"label": "10年期美债 %.2f%%" % m_tb[-1],
+                  "en": "ERP 被压扁时，先看是不是它在涨",
+                  "pct": pctile(m_tb, m_tb[-1])},
+             ]},
+        ]
+
+    # 比值面板：年度 65 年打底，月度叠在上面
+    p_ratio = {"dates": [], "series": {}}
+    ra = [(str(r["year"]) + "-12-31", f(r["erp_over_rf"])) for r in erpa
+          if f(r["erp_over_rf"]) is not None]
+    rm = [(r["date"], f(r["erp_over_rf"])) for r in erp
+          if f(r["erp_over_rf"]) is not None]
+    if ra:
+        all_d = sorted({d for d, _ in ra} | {d for d, _ in rm})
+        ma, mm = dict(ra), dict(rm)
+        p_ratio = {"dates": all_d,
+                   "series": {"年度 ERP÷无风险利率 (FCFE)": [ma.get(d) for d in all_d],
+                              "月度 ERP÷无风险利率 (T12m)": [mm.get(d) for d in all_d]}}
 
     # GPU：长表转宽表，每条 (卡型, 档位) 一列
     gdates = sorted({r["date"] for r in gpu_rows})
@@ -209,6 +270,11 @@ def build():
     add_kpi("消费者通胀预期(5年)", "%", p_ie, "消费者 · 纽约联储5年",
             "纽约联储 SCE 中位数 · 月频", True)
     add_kpi("隐含股权风险溢价", "%", p_erp, "隐含股权风险溢价", "Damodaran · 月频", True)
+    if cur_ratio is not None:
+        kpis.append({"name": "ERP ÷ 无风险利率", "unit": "", "date": erp_cur["date"],
+                     "value": cur_ratio, "is_rate": True,
+                     "note": "65年分位 %s%% · 中位 0.71" % pctile(a_ratio, cur_ratio),
+                     "chg_30": None, "chg_365": None})
     add_kpi("标普500", "", p_eq, "标普500", "FRED SP500 · 日频", daily=True)
     add_kpi("纳斯达克综合", "", p_eq, "纳斯达克综合", "FRED NASDAQCOM · 日频", daily=True)
     add_kpi("伦敦金", "美元/盎司", p_gold, "伦敦金 (美元/盎司)", "LBMA 定盘价 · 日频",
@@ -227,6 +293,16 @@ def build():
                         .isoformat(timespec="seconds").replace("+00:00", "Z"),
         "window_start": WINDOW_START,
         "kpis": kpis,
+        # ERP 三件套：推送与外部脚本直接读这里，别去反解面板表格的文案
+        "erp_pctiles": ({"month": erp_cur.get("date"), "erp": cur_erp, "ratio": cur_ratio,
+                         "p_monthly": pctile(m_erp, cur_erp),
+                         "p_annual": pctile(a_erp, cur_erp),
+                         "p_ratio": (pctile(a_ratio, cur_ratio)
+                                     if cur_ratio is not None else None),
+                         "p_r": pctile(m_er, m_er[-1]) if m_er else None,
+                         "p_tbond": pctile(m_tb, m_tb[-1]) if m_tb else None,
+                         "notes": erp_cur.get("notes") or ""}
+                        if (cur_erp is not None and a_erp) else None),
         "panels": {
             "real_rate": {"title": "① 利率期限结构：实际 vs 名义（5 / 10 / 30 年）",
                           "sub": "实线是 TIPS 实际利率，虚线是同期限名义国债利率，同期限同色。"
@@ -253,24 +329,39 @@ def build():
                        "data": p_ie},
             "erp": {"title": "③ 隐含股权风险溢价 (ERP)",
                     "sub": "Damodaran 以当前指数点位反解出的市场隐含风险补偿。"
-                           "隐含预期收益率 = 无风险利率 + ERP。",
+                           "隐含预期收益率 = 无风险利率 + ERP。"
+                           "下方三件套是约定的汇报口径 —— 绝对值、65 年量级、"
+                           "以及除以无风险利率后的比值，三个一起看才不会把"
+                           "「利率抬升」读成「风险偏好极端」。",
                     "unit": "%", "freq": "月频",
-                    "source": "NYU Stern · Damodaran ERPbymonth", "data": p_erp},
-            "equity": {"title": "④ 标普500 与纳斯达克",
+                    "month": (erp[-1]["date"][:7] if erp else None),
+                    "tables": erp_tables,
+                    "source": "NYU Stern · Damodaran ERPbymonth（月度）", "data": p_erp},
+            "erp_ratio": {"title": "④ ERP ÷ 无风险利率（1961 至今）",
+                          "sub": "ERP 的绝对值在不同利率环境下不可比，这个比值才可比。"
+                                 "年度线回到 1961，覆盖 1970s 滞胀、1999 泡沫、2008 危机、"
+                                 "2020 零利率；月度线是 2008-09 起的高频叠加。"
+                                 "参照：1996–2000 泡沫期只有 0.32–0.56，2020 零利率时 5.08，"
+                                 "65 年中位 0.71。两条线口径不同（FCFE vs T12m），"
+                                 "重叠 18 年里 15 年吻合，不要逐点对读。",
+                          "unit": "倍", "freq": "年频＋月频",
+                          "source": "NYU Stern · Damodaran histimpl（年度）＋ ERPbymonth（月度）",
+                          "data": p_ratio},
+            "equity": {"title": "⑤ 标普500 与纳斯达克",
                        "sub": "美股两大宽基指数收盘点位。", "unit": "点", "freq": "日频",
                        "source": "FRED · SP500 / NASDAQCOM / NASDAQ100", "data": p_eq},
-            "gold": {"title": "⑤ 黄金", "sub": "伦敦金银市场协会(LBMA)下午定盘价。",
+            "gold": {"title": "⑥ 黄金", "sub": "伦敦金银市场协会(LBMA)下午定盘价。",
                      "unit": "美元/盎司", "freq": "日频",
                      "source": "LBMA 官方定盘价", "data": p_gold},
-            "bitcoin": {"title": "⑥ 比特币", "sub": "Coinbase BTC-USD 日收盘价，对数坐标。",
+            "bitcoin": {"title": "⑦ 比特币", "sub": "Coinbase BTC-USD 日收盘价，对数坐标。",
                         "unit": "美元", "freq": "日频", "log": True,
                         "source": "Coinbase Exchange", "data": p_btc},
-            "gpu": {"title": "⑦ GPU 租赁价格指数",
+            "gpu": {"title": "⑧ GPU 租赁价格指数",
                     "sub": "Silicon Data 各卡型小时租赁基准价。公开层只放出滚动 7 天窗口，"
                            "本仓库每日抓取累积，历史自 2026-08-23 起在此逐日生长。",
                     "unit": "美元/小时", "freq": "日频",
                     "source": "Silicon Data · SiliconIndex", "data": p_gpu},
-            "fms": {"title": "⑧ 美银基金经理调查：拥挤交易与反向交易",
+            "fms": {"title": "⑨ 美银基金经理调查：拥挤交易与反向交易",
                     "sub": "BofA Global FMS 月度问卷。现金水位是老牌反向指标"
                            "（<4.0% 触发 sell signal）；拥挤度看的是共识有多挤，"
                            "反向交易看的是没人站的那一边。" + fms_stale,
@@ -278,7 +369,7 @@ def build():
                     "tables": fms_tables,
                     "source": "BofA Global Fund Manager Survey（派生数字口径，不含原图）",
                     "data": p_fms},
-            "normalized": {"title": "⑨ 跨资产归一对比",
+            "normalized": {"title": "⑩ 跨资产归一对比",
                            "sub": "所选区间的起点 = 100，对数坐标；切换区间基期会跟着走。"
                                   "看的是相对赔率，不是绝对价格。",
                            "unit": "指数 (区间起点=100)", "freq": "日频", "log": True,

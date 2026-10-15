@@ -8,7 +8,8 @@
 |---|---|---|---|---|
 | ① | 利率期限结构：实际 vs 名义 5/10/30 年 | 日频 | FRED `DFII5/10/30`（实际）· `DGS5/10/30`（名义） | 5/10年 2003-01；30年 2010-02 |
 | ② | 通胀预期：市场 vs 消费者 | 月频 | FRED `T10YIE`/`T5YIFR`/`EXPINF*`/`MICH` ＋ 纽约联储 SCE | 市场 2003；SCE 2013-06 |
-| ② | 隐含股权风险溢价 ERP | 月频 | NYU Stern · Damodaran `ERPbymonth.xlsx` | 2008-09 |
+| ③ | 隐含股权风险溢价 ERP ＋ 三件套分位 | 月频 | NYU Stern · Damodaran `ERPbymonth.xlsx` | 2008-09 |
+| ④ | ERP ÷ 无风险利率 | 年频＋月频 | Damodaran `histimpl.xlsx`（年度）＋ `ERPbymonth.xlsx`（月度） | **1961** |
 | ③ | 标普500 / 纳斯达克综合 / 纳斯达克100 | 日频 | FRED `SP500` / `NASDAQCOM` / `NASDAQ100` | 标普 10 年上限；纳指 1971 |
 | ④ | 黄金（伦敦金定盘价） | 日频 | LBMA 官方 JSON | 1968-04 |
 | ⑤ | 比特币 | 日频 | Coinbase Exchange BTC-USD | 2015-07 |
@@ -21,7 +22,8 @@
 data/
   real_rates.csv       date, dfii5, dfii10, dfii30, dgs5, dgs10, dgs30, t5yie, t10yie, t5yifr, ...
   inflation_expectations.csv  date, be5y, be10y, be30y, fwd5y5y, cleveland_*, michigan_1y, sce_1y/3y/5y
-  erp_monthly.csv      date, erp_t12m, tbond_rate, expected_return, sp500, ...
+  erp_monthly.csv      date, erp_t12m, tbond_rate, expected_return, erp_over_rf, sp500, ...
+  erp_annual.csv       year, erp_fcfe, tbond_rate, erp_over_rf, ...（1961 起 65 年）
   equity_indices.csv   date, sp500, nasdaq_comp, nasdaq_100
   gold.csv             date, usd_per_oz
   bitcoin.csv          date, close, high, low
@@ -62,7 +64,28 @@ scripts/               抓取与构建脚本，纯标准库，无需 pip install
 消费者口径长期系统性高于市场口径一个百分点以上 —— 普通人对食品、油价、房租这些
 高频可见价格更敏感，而市场定价的是一篮子 CPI 的加权平均。这个差不是谁错了，是两回事。
 
-**② ERP 的日期约定。** Damodaran 表中标记为 `YYYY-MM-01` 的那一行，用的是**上月最后一个
+**③ ERP 必须报「三件套」，只看一个数会读反。** 2026-10-15 与用户确认的汇报口径：
+
+1. **月度 ERP (T12m) 分位** —— 2008-09 至今，`ERPbymonth.xlsx`
+2. **年度 ERP (FCFE) 分位** —— 1961 至今 65 年，`histimpl.xlsx`
+3. **ERP ÷ 无风险利率分位** —— 跨利率环境校准，年度口径
+
+2026-10 就是最好的例子：ERP 3.70% 是 2008 年以来最低（月度分位 **0%**），
+但放进 65 年年度分布只是 **40%** 分位，除以无风险利率后的比值 0.70 更只有 **49%** 分位
+（65 年中位 0.71）。**绝对值创后 2008 新低，相对利率只是中性** —— 差别全在 10Y
+从 0.5% 涨到 5.3%。只播月度分位，会把「利率抬升」误读成「风险偏好极端」。
+
+参照：1996–2000 泡沫期比值仅 0.32–0.56，2020 零利率时高达 5.08。
+
+**两条序列口径不同，不可混用。** 月度是 ERP (T12m)，年度是 Implied ERP (FCFE)。
+重叠 18 年里 15 年吻合，但 2011/2012/2020 分别差 131/22/52 bp。
+**年度分位只作量级校准，不作精确读数。** 抓取时会用原表自带的 ERP/Riskfree 列
+逐年对账，偏差 >0.02 直接抛错。
+
+年度文件官网同时挂 `.xls` 与 `.xlsx`，内容一致（65 年 × 8 字段逐项比对零偏差），
+本仓库取 `.xlsx` 以便继续用标准库 zipfile 解析，不引 xlrd。
+
+**③ ERP 的日期约定。** Damodaran 表中标记为 `YYYY-MM-01` 的那一行，用的是**上月最后一个
 交易日**的指数点位反解出来的。所以 `2026-08-01` 这一行描述的是 7 月底的市场状态。
 这是原始数据的口径，本仓库不改写。
 

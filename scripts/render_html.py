@@ -270,7 +270,7 @@ function Chart(box, panel){
   function dashOf(l){ return DASH.indexOf(l)>=0; }
   var hidden={};
   (panel.hidden||[]).forEach(function(l){ hidden[l]=true; });
-  var FULL_RANGE={erp:1, gpu:1, fms:1, infexp:1};
+  var FULL_RANGE={erp:1, erp_ratio:1, gpu:1, fms:1, infexp:1};
   var days = FULL_RANGE[panel.key] ? 0 : 1825;
   var svgNS="http://www.w3.org/2000/svg";
   var svg=document.createElementNS(svgNS,"svg");
@@ -452,7 +452,7 @@ Object.keys(D.panels).forEach(function(key){
     card.querySelector("h2").insertAdjacentHTML("beforeend",
       '<span class="xmonth">当期截面 '+esc(p.month||"")+'</span>');
     xs.innerHTML = p.tables.map(function(t){
-      var mx = Math.max.apply(null, t.items.map(function(i){
+      var mx = t.scale ? t.scale : Math.max.apply(null, t.items.map(function(i){
         return Math.abs(i.pct||0);}).concat([1]));
       return '<div><h3>'+esc(t.title)+'</h3><p class="xnote">'+esc(t.note)+'</p>'
         + t.items.map(function(i){
