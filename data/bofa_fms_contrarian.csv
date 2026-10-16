@@ -116,3 +116,11 @@ month,kind,rank,item,item_cn,pct
 2026-09,tail_risk,6,US dollar debasement,美元贬值失序,2
 2026-09,most_underweight,7,Utilities,,
 2026-09,most_underweight,8,Eurozone,,
+2026-10,most_underweight,1,Bonds,,
+2026-10,sector_underweight,1,Discretionary,,-34
+2026-10,tail_risk,1,Disorderly rise in bond yields,债券收益率无序上行,31
+2026-10,most_underweight,2,UK,,
+2026-10,tail_risk,2,AI bubble,AI 泡沫,23
+2026-10,most_underweight,3,REITs,,
+2026-10,tail_risk,3,2nd wave of inflation,第二波通胀,20
+2026-10,most_underweight,4,Discretionary,,
