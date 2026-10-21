@@ -1,5 +1,5 @@
 {
-  "run_at_utc": "2026-10-21T00:36:50+00:00",
+  "run_at_utc": "2026-10-21T04:44:20+00:00",
   "full": false,
   "jobs": [
     {
@@ -7,7 +7,7 @@
       "label": "实际利率期限结构",
       "ok": true,
       "rows": 16185,
-      "added": 1,
+      "added": 0,
       "last_date": "2026-10-20"
     },
     {
@@ -22,16 +22,16 @@
       "job": "equity_indices",
       "label": "股指",
       "ok": true,
-      "rows": 14046,
-      "added": 0,
-      "last_date": "2026-10-19"
+      "rows": 14047,
+      "added": 1,
+      "last_date": "2026-10-20"
     },
     {
       "job": "gold",
       "label": "黄金",
       "ok": true,
       "rows": 14708,
-      "added": 1,
+      "added": 0,
       "last_date": "2026-10-21",
       "source": "gold-api.com（备用）"
     },
@@ -40,16 +40,14 @@
       "label": "比特币",
       "ok": true,
       "rows": 4112,
-      "added": 1,
+      "added": 0,
       "last_date": "2026-10-21"
     },
     {
-      "job": "gpu_rental",
+      "job": "fetch_gpu",
       "label": "GPU租赁指数",
-      "ok": true,
-      "rows": 413,
-      "added": 7,
-      "last_date": "2026-10-20"
+      "ok": false,
+      "error": "RuntimeError: silicon data: mi300x/neo-cloud 解析不到数据（其余 180 个点已入库）"
     },
     {
       "job": "erp_monthly",
