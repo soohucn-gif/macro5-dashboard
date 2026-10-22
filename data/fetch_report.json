@@ -1,53 +1,47 @@
 {
-  "run_at_utc": "2026-10-21T04:44:20+00:00",
+  "run_at_utc": "2026-10-22T00:42:36+00:00",
   "full": false,
   "jobs": [
     {
-      "job": "real_rates",
+      "job": "fetch_real_rate",
       "label": "实际利率期限结构",
-      "ok": true,
-      "rows": 16185,
-      "added": 0,
-      "last_date": "2026-10-20"
+      "ok": false,
+      "error": "RuntimeError: GET failed after 4 tries: https://fred.stlouisfed.org/graph/fredgraph.csv?id=DFII5 (ValueError: FRED DFII5: unexpected header ['<!doctype html>'])"
     },
     {
-      "job": "inflation_expectations",
+      "job": "fetch_inflation_expectations",
       "label": "通胀预期",
-      "ok": true,
-      "rows": 586,
-      "added": 0,
-      "last_date": "2026-10-01"
+      "ok": false,
+      "error": "RuntimeError: GET failed after 4 tries: https://fred.stlouisfed.org/graph/fredgraph.csv?id=T30YIEM (ValueError: FRED T30YIEM: unexpected header ['<!doctype html>'])"
     },
     {
-      "job": "equity_indices",
+      "job": "fetch_equity",
       "label": "股指",
-      "ok": true,
-      "rows": 14047,
-      "added": 1,
-      "last_date": "2026-10-20"
+      "ok": false,
+      "error": "RuntimeError: GET failed after 4 tries: https://fred.stlouisfed.org/graph/fredgraph.csv?id=SP500 (ValueError: FRED SP500: unexpected header ['<!doctype html>'])"
     },
     {
       "job": "gold",
       "label": "黄金",
       "ok": true,
-      "rows": 14708,
-      "added": 0,
-      "last_date": "2026-10-21",
+      "rows": 14709,
+      "added": 1,
+      "last_date": "2026-10-22",
       "source": "gold-api.com（备用）"
     },
     {
       "job": "bitcoin",
       "label": "比特币",
       "ok": true,
-      "rows": 4112,
-      "added": 0,
-      "last_date": "2026-10-21"
+      "rows": 4113,
+      "added": 1,
+      "last_date": "2026-10-22"
     },
     {
       "job": "fetch_gpu",
       "label": "GPU租赁指数",
       "ok": false,
-      "error": "RuntimeError: silicon data: mi300x/neo-cloud 解析不到数据（其余 180 个点已入库）"
+      "error": "RuntimeError: silicon data: 0 points parsed"
     },
     {
       "job": "erp_monthly",
