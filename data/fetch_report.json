@@ -1,31 +1,35 @@
 {
-  "run_at_utc": "2026-10-22T00:42:36+00:00",
+  "run_at_utc": "2026-10-22T04:54:31+00:00",
   "full": false,
   "jobs": [
     {
       "job": "fetch_real_rate",
       "label": "实际利率期限结构",
       "ok": false,
-      "error": "RuntimeError: GET failed after 4 tries: https://fred.stlouisfed.org/graph/fredgraph.csv?id=DFII5 (ValueError: FRED DFII5: unexpected header ['<!doctype html>'])"
+      "error": "RuntimeError: GET failed after 4 tries: https://fred.stlouisfed.org/graph/fredgraph.csv?id=DFII30 (HTTPError: HTTP Error 502: Bad Gateway)"
     },
     {
-      "job": "fetch_inflation_expectations",
+      "job": "inflation_expectations",
       "label": "通胀预期",
-      "ok": false,
-      "error": "RuntimeError: GET failed after 4 tries: https://fred.stlouisfed.org/graph/fredgraph.csv?id=T30YIEM (ValueError: FRED T30YIEM: unexpected header ['<!doctype html>'])"
+      "ok": true,
+      "rows": 586,
+      "added": 0,
+      "last_date": "2026-10-01"
     },
     {
-      "job": "fetch_equity",
+      "job": "equity_indices",
       "label": "股指",
-      "ok": false,
-      "error": "RuntimeError: GET failed after 4 tries: https://fred.stlouisfed.org/graph/fredgraph.csv?id=SP500 (ValueError: FRED SP500: unexpected header ['<!doctype html>'])"
+      "ok": true,
+      "rows": 14048,
+      "added": 1,
+      "last_date": "2026-10-21"
     },
     {
       "job": "gold",
       "label": "黄金",
       "ok": true,
       "rows": 14709,
-      "added": 1,
+      "added": 0,
       "last_date": "2026-10-22",
       "source": "gold-api.com（备用）"
     },
@@ -34,7 +38,7 @@
       "label": "比特币",
       "ok": true,
       "rows": 4113,
-      "added": 1,
+      "added": 0,
       "last_date": "2026-10-22"
     },
     {
