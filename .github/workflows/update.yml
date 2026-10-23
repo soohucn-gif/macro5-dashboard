@@ -37,6 +37,10 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
+    # 放在 job 级：step 的 `if:` 在 step 自己的 env 生效之前就求值了，
+    # 只有挂到这里，`if: env.ANTHROPIC_API_KEY != ''` 才读得到。
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -56,7 +60,7 @@ jobs:
           echo "monthly=$MONTHLY" >> "$GITHUB_OUTPUT"
 
       # 单一数据源挂掉不能拖垮整轮：先尽力抓、尽力提交，最后一步再把失败暴露出来。
-      - name: 抓取六类数据
+      - name: 抓取各类数据
         id: fetch
         continue-on-error: true
         run: python3 scripts/fetch_all.py ${{ steps.mode.outputs.full }}
@@ -64,6 +68,31 @@ jobs:
       - name: 重建看板与当日快照
         id: build
         run: python3 scripts/build_dashboard.py
+
+      # 下面两步是仅有的第三方依赖。核心管道（fetch_all / build_dashboard）保持纯标准库，
+      # 所以这里装在后面 —— 装不上也不影响当天数据已经抓完、看板已经重建。
+      - name: 安装 Anthropic SDK
+        if: env.ANTHROPIC_API_KEY != ''
+        continue-on-error: true
+        run: pip install -q anthropic
+
+      # 每月取一期美银 FMS。脚本自带两道闸门：当月 15 号之前不跑、已入库的月份不跑，
+      # 所以可以天天调用而不会重复花搜索额度。写出的 payload 仍要过 append_fms.py 校验。
+      - name: 抓取美银 FMS（Claude + web search）
+        if: env.ANTHROPIC_API_KEY != ''
+        continue-on-error: true
+        run: |
+          python3 scripts/fms_api.py --out /tmp/fms_payload.json
+          if [ -s /tmp/fms_payload.json ]; then
+            python3 scripts/append_fms.py /tmp/fms_payload.json
+            python3 scripts/build_dashboard.py      # 新一期进库了，重建一次
+          fi
+
+      # 当日点评。失败只打 warning，推送照发 —— 点评是加分项，不能挡住那条消息。
+      - name: 生成当日点评
+        if: env.ANTHROPIC_API_KEY != ''
+        continue-on-error: true
+        run: python3 scripts/commentary.py
 
       # 每天一条飞书私聊（Henry）。always() 保证构建失败也会推"失败"而不是静默；
       # 脚本内部按 data/last_notify.txt 去重，补枪与月度快照运行不会重复推。

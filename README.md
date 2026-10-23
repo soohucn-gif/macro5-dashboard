@@ -35,8 +35,10 @@ data/
   daily/YYYY-MM-DD.md  当日文本快照存档
   monthly/YYYY-MM.md   月度文本快照（环比 / 同比 / 月内区间）
   fetch_report.json    上一轮各源成败与增量行数
+  commentary.md        当日中文点评（Claude 生成，随飞书推送）
 index.html             自包含单文件看板（无外部依赖）
-scripts/               抓取与构建脚本，纯标准库，无需 pip install
+scripts/               抓取与构建脚本。核心管道纯标准库；
+                       fms_api.py 与 commentary.py 需要 anthropic SDK（见下）
 ```
 
 ## 几处必须说明的口径
@@ -102,14 +104,17 @@ Neo-Cloud 与超大规模云两档，H200 / B200 / MI300X 只公开 Neo-Cloud �
 
 取数链路（**主路径走公开互联网，不依赖本机任何存档**）：
 
-1. **主路径** — `macro5-fms-monthly` 定时任务（每月 16/18/20/22/24 号 09:40）从公开媒体
-   （Reuters / CNBC / ZeroHedge / Mace News / hedgefundtips / 华尔街见闻 等）检索新一期结果，
-   交叉验证后组成 JSON，经 `scripts/append_fms.py` **校验**写入。校验会挡住：缺出处、
-   月份格式错、现金水位越界、拥挤交易缺失等情况 —— 没有出处的数字不进库。
-   每期都记 `sources`（实际读过的 URL）与 `confidence`（high/medium/low）。
-2. **校正路径** — `bofa-fms-monthly` 任务逐张读 BofA 原图（私有存档），比通稿转述更权威；
-   若与主路径写入的数字有出入，用 `scripts/sync_bofa_fms.py` 按月覆盖该期并说明差异。
-3. 云端 Actions 只是把已提交的 CSV 读进看板，不参与取数。
+1. **主路径（2026-10-23 起）** — `scripts/fms_api.py` 在 GitHub Actions 里调用
+   Claude API + web search 检索新一期结果，按固定 JSON schema 输出，再经
+   `scripts/append_fms.py` **校验**写入。校验会挡住：缺出处、月份格式错、
+   现金水位越界、拥挤交易缺失 —— 没有出处的数字不进库。
+   脚本还会把模型给的 `sources` 与 web search 真正返回过的 URL 做交集过滤，
+   **没在搜索结果里出现过的链接一律丢掉**，防的是编链接。
+   两道闸门控制调用量：当月 15 号之前不跑、该月已入库就不跑。
+2. **兜底路径** — 本机 `macro5-fms-monthly` 定时任务（16/18/20/22/24 号），
+   云端没取到时补位。它开头就检查「已入库则安静退出」，不会与云端抢写同一个月。
+3. **校正路径** — `bofa-fms-monthly` 任务逐张读 BofA 原图（私有存档），比通稿转述更权威；
+   若与前两条写入的数字有出入，用 `scripts/sync_bofa_fms.py` 按月覆盖该期并说明差异。
 
 两条路径都是**按月幂等替换**，互不覆盖对方的月份。若超过 45 天没有新一期，看板面板会自己标出来。
 
@@ -122,15 +127,22 @@ python3 scripts/build_dashboard.py      # 重建 index.html + dashboard.json + l
 python3 scripts/monthly_snapshot.py 2026-08
 python3 scripts/append_fms.py payload.json   # 主路径：写入一期网络来源的 FMS（带校验）
 python3 scripts/sync_bofa_fms.py            # 校正路径：用本机私有存档的原图读数覆盖
+
+# 下面两个需要 anthropic SDK 与 ANTHROPIC_API_KEY（没 key 会自己跳过，不报错）
+pip install anthropic
+python3 scripts/fms_api.py --dry-run        # 主路径：Claude + web search 抓一期 FMS
+python3 scripts/commentary.py --dry-run     # 当日中文点评
 ```
 
-无第三方依赖，Python 3.8+ 即可。
+**核心管道零依赖**（`fetch_all.py` / `build_dashboard.py` / `append_fms.py` 等），Python 3.8+ 即可。
+只有 `fms_api.py` 与 `commentary.py` 用 `anthropic` SDK，且都是可降级的：
+没装包或没配 key 就安静跳过，当天的数据抓取、看板重建、飞书推送全都照常。
 
 ## 自动化
 
 `.github/workflows/update.yml`
 
-- 每日两枪：主枪 22:12 UTC、补枪 00:12 UTC —— 抓取 → 重建看板 → 飞书推送 → 提交推送。
+- 每日两枪：主枪 22:12 UTC、补枪 00:12 UTC —— 抓取 → 重建看板 → FMS（按需）→ 点评 → 飞书推送 → 提交推送。
   GitHub 的定时触发天天迟到：2026-09 实测主枪约 00:00–00:50 UTC（北京 08:00–08:50）才开跑，
   补枪约 04:30–05:00 UTC。飞书推送实际在北京 8 点多到
 - 每月 2 号 12:23 UTC：额外生成上月月度快照

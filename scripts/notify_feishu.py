@@ -17,6 +17,8 @@
     紧随其后；30 日变动越过阈值的单独提示：
     实际/名义利率 ±10bp、股指 ±2%、黄金 ±2%、BTC ±5%。
   - 发送失败以非零退出，让 Actions 把它标红。
+  - 若 data/commentary.md 是**今天**生成的，附在数值后面。缺了就不附 ——
+    点评是加分项，任何情况下都不能挡住这条推送。
 """
 import datetime
 import json
@@ -167,8 +169,30 @@ def compose(dash, report, build_failed):
     if alerts:
         lines.append("⚠ 30日变动：" + "，".join(alerts))
 
+    note = today_commentary()
+    if note:
+        lines.append("")
+        lines.append(note)
+
     lines.append(DASHBOARD_URL)
     return "\n".join(lines)
+
+
+COMMENTARY = os.path.join(DATA, "commentary.md")
+
+
+def today_commentary():
+    """读当日点评。非今天生成的、读不到的，一律当没有 —— 宁可不附，不可附旧的。"""
+    try:
+        with open(COMMENTARY, encoding="utf-8") as fh:
+            raw = fh.read()
+    except OSError:
+        return ""
+    today = datetime.datetime.now(BJT).strftime("%Y-%m-%d")
+    head, _, body = raw.partition("\n")
+    if not head.startswith("<!--") or today not in head:
+        return ""
+    return body.strip()
 
 
 def send(text):
