@@ -127,10 +127,9 @@ def main():
         msg = "%s: %s" % (type(e).__name__, e)
         cfg = any(k in msg for k in ("authentication", "permission", "not scoped",
                                      "invalid_request_error", "401", "403", "400"))
-        print("::error::点评%s（推送照常，但这个错误会天天复现，需要处理）：%s"
-              % ("配置有误" if cfg else "生成失败", msg) if cfg else
-              "::warning::点评生成失败（推送照常，可能是临时抖动）：%s" % msg,
-              file=sys.stderr)
+        tag = ("::error::点评配置有误（推送照常，但这个错天天都会复现，要处理）"
+               if cfg else "::warning::点评生成失败（推送照常，可能只是临时抖动）")
+        print("%s：%s" % (tag, msg), file=sys.stderr)
         return 0
 
     print(text)
