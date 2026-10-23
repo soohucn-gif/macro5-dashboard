@@ -358,12 +358,17 @@ _PT_RE = re.compile(r'\\?"(\d{4}-\d{2}-\d{2})\\?":\s*\\?"([\d.]+)\\?"')
 
 
 def _gpu_page(raw):
-    """图表页 → (页面实际档位 or None, [(date, 价格)])。找不到指数块就抛错，交给 http_get 重试。"""
+    """图表页 → (页面实际档位 or None, [(date, 价格)])。
+
+    找不到指数块就抛错，交给 http_get 重试（上游有时 200 但正文是错误页）。
+    指数块在、但 indexes 是空对象：公开图表页的常态，返回空列表，由 fetch_gpu
+    跳过该档，不再空转重试。
+    """
     html = raw.decode("utf-8", errors="ignore")
     m = _IDX_RE.search(html)
-    pts = _PT_RE.findall(m.group(1)) if m else []
-    if not pts:
+    if not m:
         raise ValueError("no index points in page")
+    pts = _PT_RE.findall(m.group(1))
     # 页面对不支持双档的卡会静默回落到 neo-cloud，此处以回传的 initialMainTab 为准
     got = re.search(r'initialMainTab\\?":\\?"([a-z\-]+)', html)
     return (got.group(1) if got else None), pts
@@ -375,31 +380,40 @@ def fetch_gpu():
     所以本地 CSV 用 append 语义：每天跑一次，历史就在仓库里自己长出来。
     没有任何 10 年历史可回补 —— 该指数 2025 年才发布。
 
-    某张卡的页面解析不出来时，其余卡照常入库，但整类仍记失败 ——
-    否则那张卡会悄无声息地停更，而错过的 7 天窗口事后补不回来。
+    公开图表 HTML 的 indexes 经常是空的；GPU Index API 要 Plus 鉴权，这里不接。
+    单个 gpu/segment 档位缺失或为空时只打警告并跳过，其余档照常入库，本类仍算成功，
+    免得一张卡把整轮日更拖红（2026-10-21 mi300x/neo-cloud 就是这样）。
+    一个点都没有才记失败 —— 那是整站没数，不是单档缺数。
     """
     rows, missing = [], []
     for gpu in GPUS:
         for seg in SEGMENTS[gpu]:
             url = ("https://portal.silicondata.com/gpu-index-chart"
                    "?standalone=true&gpu=%s&mainTab=%s" % (gpu, seg))
+            slot = "%s/%s" % (gpu, seg)
             try:
                 seg_actual, pts = http_get(url, parse=_gpu_page)
             except RuntimeError:
-                missing.append("%s/%s" % (gpu, seg))
+                missing.append(slot)
+                continue
+            if not pts:
+                missing.append(slot)
                 continue
             for d, v in pts:
                 rows.append({"date": d, "gpu": gpu.upper(), "segment": seg_actual or seg,
                              "usd_per_hr": v})
     if not rows:
-        raise RuntimeError("silicon data: 0 points parsed")
+        detail = "、".join(missing) if missing else "no slots"
+        raise RuntimeError("silicon data: 0 points parsed（%s）" % detail)
     n, added = merge_csv(os.path.join(DATA, "gpu_rental.csv"),
                          ["date", "gpu", "segment", "usd_per_hr"],
                          ("date", "gpu", "segment"), rows)
+    last = max(r["date"] for r in rows)
     if missing:
-        raise RuntimeError("silicon data: %s 解析不到数据（其余 %d 个点已入库）"
-                           % ("、".join(missing), len(rows)))
-    return "gpu_rental", n, added, max(r["date"] for r in rows)
+        print("[warn] silicon data: %s 解析不到数据，已跳过（其余 %d 个点已入库）"
+              % ("、".join(missing), len(rows)), file=sys.stderr, flush=True)
+        return "gpu_rental", n, added, last, "Silicon Data（缺 %s）" % "、".join(missing)
+    return "gpu_rental", n, added, last
 
 
 # --------------------------------------------- 6. 隐含股权风险溢价 (Damodaran)
