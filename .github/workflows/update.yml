@@ -26,6 +26,10 @@ on:
         description: "强制推送一条飞书（忽略当日已推标记）"
         type: boolean
         default: false
+      fms_test:
+        description: "FMS 试跑：忽略日期/已入库两道闸门，只打印 payload 不写库"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -82,6 +86,10 @@ jobs:
         if: env.ANTHROPIC_API_KEY != ''
         continue-on-error: true
         run: |
+          if [ "${{ github.event.inputs.fms_test }}" = "true" ]; then
+            python3 scripts/fms_api.py --force --dry-run    # 只打印，不写库
+            exit 0
+          fi
           python3 scripts/fms_api.py --out /tmp/fms_payload.json
           if [ -s /tmp/fms_payload.json ]; then
             python3 scripts/append_fms.py /tmp/fms_payload.json
