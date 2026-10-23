@@ -65,8 +65,13 @@ SCHEMA = {
         "month": {"type": "string", "description": "YYYY-MM"},
         "release_date": STR_OR_NULL,
         "cash_pct": NUM_OR_NULL,
-        "cash_rule_signal": {"type": ["string", "null"], "enum": ["sell", "neutral", "buy", None],
-                             "description": "按现金水位自己判：≤4.0 sell，≥5.0 buy，之间 neutral"},
+        # 注意：strict schema 不接受 enum 配 union 类型（"Enum value 'sell' does not
+        # match declared type ['string','null']"）。所以用纯 string + 一个 unknown 哨兵，
+        # 写库前再把 unknown 抹掉。
+        "cash_rule_signal": {"type": "string",
+                             "enum": ["sell", "neutral", "buy", "unknown"],
+                             "description": "按现金水位自己判：≤4.0 sell，≥5.0 buy，"
+                                            "之间 neutral；拿不到现金水位填 unknown"},
         "sentiment_score": NUM_OR_NULL,
         "net_ow_equities": NUM_OR_NULL,
         "net_ow_us_equities": NUM_OR_NULL,
@@ -268,6 +273,8 @@ def main():
         return 0
 
     payload.pop("found", None)
+    if payload.get("cash_rule_signal") == "unknown":
+        payload.pop("cash_rule_signal")          # 哨兵不进库
     # 清掉 null，让 append_fms 的「缺字段」判断走它自己那套
     payload = {k: v for k, v in payload.items() if v is not None}
     blob = json.dumps(payload, ensure_ascii=False, indent=2)
