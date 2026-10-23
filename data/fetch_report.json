@@ -1,12 +1,14 @@
 {
-  "run_at_utc": "2026-10-22T04:54:31+00:00",
+  "run_at_utc": "2026-10-23T00:40:36+00:00",
   "full": false,
   "jobs": [
     {
-      "job": "fetch_real_rate",
+      "job": "real_rates",
       "label": "实际利率期限结构",
-      "ok": false,
-      "error": "RuntimeError: GET failed after 4 tries: https://fred.stlouisfed.org/graph/fredgraph.csv?id=DFII30 (HTTPError: HTTP Error 502: Bad Gateway)"
+      "ok": true,
+      "rows": 16187,
+      "added": 2,
+      "last_date": "2026-10-22"
     },
     {
       "job": "inflation_expectations",
@@ -21,25 +23,25 @@
       "label": "股指",
       "ok": true,
       "rows": 14048,
-      "added": 1,
+      "added": 0,
       "last_date": "2026-10-21"
     },
     {
       "job": "gold",
       "label": "黄金",
       "ok": true,
-      "rows": 14709,
-      "added": 0,
-      "last_date": "2026-10-22",
+      "rows": 14710,
+      "added": 1,
+      "last_date": "2026-10-23",
       "source": "gold-api.com（备用）"
     },
     {
       "job": "bitcoin",
       "label": "比特币",
       "ok": true,
-      "rows": 4113,
-      "added": 0,
-      "last_date": "2026-10-22"
+      "rows": 4114,
+      "added": 1,
+      "last_date": "2026-10-23"
     },
     {
       "job": "fetch_gpu",
