@@ -45,6 +45,8 @@ jobs:
     # 只有挂到这里，`if: env.ANTHROPIC_API_KEY != ''` 才读得到。
     env:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # 只有组织级（未绑 workspace）的 key 才需要这个；workspace 级 key 留空即可
+      ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
     steps:
       - uses: actions/checkout@v4
 

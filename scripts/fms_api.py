@@ -174,10 +174,17 @@ def host(u):
     return m.group(1).lower().lstrip("www.") if m else ""
 
 
-def run(month, model=MODEL):
-    import anthropic                                   # 延迟导入：没装也不该拖垮别的脚本
+def _client():
+    """组织级 API key 必须带 anthropic-workspace-id 头；workspace 级 key 不用。
+    两种都支持：设了 ANTHROPIC_WORKSPACE_ID 就带上，没设就按 workspace 级 key 走。"""
+    import anthropic
+    ws = os.environ.get("ANTHROPIC_WORKSPACE_ID", "").strip()
+    return anthropic.Anthropic(
+        default_headers={"anthropic-workspace-id": ws} if ws else None)
 
-    client = anthropic.Anthropic()
+
+def run(month, model=MODEL):
+    client = _client()
     y, mo = int(month[:4]), int(month[5:7])
     messages = [{"role": "user", "content": PROMPT.format(
         month=month, month_en="%s %d" % (MONTH_EN[mo], y), month_cn="%d年%d月" % (y, mo),

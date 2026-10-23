@@ -84,9 +84,16 @@ def build_prompt(dash):
                fmt_kpis(dash), erp_line, fmt_fms(dash)))
 
 
-def generate(dash, model=MODEL):
+def _client():
+    """组织级 API key 必须带 anthropic-workspace-id 头；workspace 级 key 不用。"""
     import anthropic
-    client = anthropic.Anthropic()
+    ws = os.environ.get("ANTHROPIC_WORKSPACE_ID", "").strip()
+    return anthropic.Anthropic(
+        default_headers={"anthropic-workspace-id": ws} if ws else None)
+
+
+def generate(dash, model=MODEL):
+    client = _client()
     resp = client.messages.create(
         model=model, max_tokens=2000,
         system=SYSTEM,
@@ -115,7 +122,14 @@ def main():
             dash = json.load(fh)
         text, usage = generate(dash, a.model)
     except Exception as e:                       # noqa: BLE001 — 点评失败绝不能挡住推送
-        print("::warning::点评生成失败（推送照常）：%s: %s" % (type(e).__name__, e),
+        # 一律返回 0（推送是铁律），但把**配置类**错误和「接口抖了一下」区分开：
+        # 前者天天都会复现，必须在 Actions 日志里醒目，否则点评会静默失效很久没人发现。
+        msg = "%s: %s" % (type(e).__name__, e)
+        cfg = any(k in msg for k in ("authentication", "permission", "not scoped",
+                                     "invalid_request_error", "401", "403", "400"))
+        print("::error::点评%s（推送照常，但这个错误会天天复现，需要处理）：%s"
+              % ("配置有误" if cfg else "生成失败", msg) if cfg else
+              "::warning::点评生成失败（推送照常，可能是临时抖动）：%s" % msg,
               file=sys.stderr)
         return 0
 
