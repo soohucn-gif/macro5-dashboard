@@ -1,5 +1,5 @@
 {
-  "run_at_utc": "2026-10-23T14:01:17+00:00",
+  "run_at_utc": "2026-10-23T14:12:14+00:00",
   "full": false,
   "jobs": [
     {
@@ -44,10 +44,13 @@
       "last_date": "2026-10-23"
     },
     {
-      "job": "fetch_gpu",
+      "job": "gpu_rental",
       "label": "GPU租赁指数",
-      "ok": false,
-      "error": "RuntimeError: silicon data: 0 points parsed"
+      "ok": true,
+      "rows": 413,
+      "added": 0,
+      "last_date": "2026-10-20",
+      "source": "上游无数据（最后有值 2026-10-20）"
     },
     {
       "job": "erp_monthly",

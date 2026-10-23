@@ -139,7 +139,16 @@ def compose(dash, report, build_failed):
                      % (num(gold["value"]), yoy(gold), num(btc["value"]), yoy(btc)))
     h100, b200 = g("GPU H100 · Neo-Cloud"), g("GPU B200 · Neo-Cloud")
     if h100 and b200:
-        lines.append("GPU H100 $%.2f/h · B200 $%.2f/h" % (h100["value"], b200["value"]))
+        seg = "GPU H100 $%.2f/h · B200 $%.2f/h" % (h100["value"], b200["value"])
+        # 上游停更时必须标出数据日期，否则旧价会被当成今天的（参照 2026-09-01 那次实际利率）
+        try:
+            age = (datetime.datetime.now(BJT).date()
+                   - datetime.date.fromisoformat(h100["date"])).days
+        except (TypeError, ValueError):
+            age = 0
+        if age >= 3:
+            seg += "（截至%s，上游已%d天未放数）" % (h100["date"][5:], age)
+        lines.append(seg)
 
     alerts = []
     for short, real_name, nom_name in TENORS:

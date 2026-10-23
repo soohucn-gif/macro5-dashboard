@@ -358,12 +358,18 @@ _PT_RE = re.compile(r'\\?"(\d{4}-\d{2}-\d{2})\\?":\s*\\?"([\d.]+)\\?"')
 
 
 def _gpu_page(raw):
-    """图表页 → (页面实际档位 or None, [(date, 价格)])。找不到指数块就抛错，交给 http_get 重试。"""
+    """图表页 → (页面实际档位 or None, [(date, 价格)])。
+
+    **找不到 indexes 结构**才抛错（页面改版 / 被挡 / 半截响应），交给 http_get 重试。
+    **结构在但里面是空的**返回空列表，不抛 —— 2026-10-21 起上游连续几天如此，
+    页面自己显示 "No chart data available"。这是「当期没放数」，不是抓取失败，
+    重试多少次都一样，上层据此降级为告警而不是整轮标红。
+    """
     html = raw.decode("utf-8", errors="ignore")
     m = _IDX_RE.search(html)
-    pts = _PT_RE.findall(m.group(1)) if m else []
-    if not pts:
-        raise ValueError("no index points in page")
+    if not m:
+        raise ValueError("no indexes block in page")
+    pts = _PT_RE.findall(m.group(1))
     # 页面对不支持双档的卡会静默回落到 neo-cloud，此处以回传的 initialMainTab 为准
     got = re.search(r'initialMainTab\\?":\\?"([a-z\-]+)', html)
     return (got.group(1) if got else None), pts
@@ -391,8 +397,21 @@ def fetch_gpu():
             for d, v in pts:
                 rows.append({"date": d, "gpu": gpu.upper(), "segment": seg_actual or seg,
                              "usd_per_hr": v})
+    total_pages = sum(len(v) for v in SEGMENTS.values())
     if not rows:
-        raise RuntimeError("silicon data: 0 points parsed")
+        # 区分两种空：页面能打开、结构也还在，只是上游当期没放数（2026-10-21 起连续空，
+        # 页面自己显示 "No chart data available"）—— 这种不该天天把整轮标红。
+        # 全部页面都解析不出结构才算真改版。
+        if len(missing) < total_pages:
+            existing = read_csv(os.path.join(DATA, "gpu_rental.csv"))
+            last = max((r["date"] for r in existing), default="—")
+            print("[warn] gpu: %d/%d 个页面正常返回但 indexes 为空"
+                  "（Silicon Data 当期未放数），保留已有历史，最后有值 %s"
+                  % (total_pages - len(missing), total_pages, last), file=sys.stderr)
+            return ("gpu_rental", len(existing), 0, last,
+                    "上游无数据（最后有值 %s）" % last)
+        raise RuntimeError("silicon data: %d 个页面均未解析出 indexes 结构，像是改版了"
+                           % total_pages)
     n, added = merge_csv(os.path.join(DATA, "gpu_rental.csv"),
                          ["date", "gpu", "segment", "usd_per_hr"],
                          ("date", "gpu", "segment"), rows)

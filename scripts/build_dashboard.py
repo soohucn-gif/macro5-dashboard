@@ -186,6 +186,15 @@ def build():
         ]
         fms_tables = [t for t in fms_tables if t["items"]]
 
+    # GPU 上游会整天不放数（2026-10-21 起连续空）。看板必须自己说出来，
+    # 否则读者会把几天前的价当成今天的。
+    gpu_stale = ""
+    if p_gpu["dates"]:
+        age = (TODAY - datetime.date.fromisoformat(p_gpu["dates"][-1])).days
+        if age >= 3:
+            gpu_stale = ("　⚠️ 上游最后放数 %s，已 %d 天未更新（Silicon Data 当期未放数）。"
+                         % (p_gpu["dates"][-1], age))
+
     # 跨资产归一：十年窗口内各自首个有效值 = 100
     def rebase(p, label, out_label):
         vals = p["series"].get(label)
@@ -309,7 +318,7 @@ def build():
                         "unit": "美元", "freq": "日频", "log": True,
                         "source": "Coinbase Exchange", "data": p_btc},
             "gpu": {"title": "⑦ GPU 租赁价格指数",
-                    "sub": "Silicon Data 各卡型小时租赁基准价。公开层只放出滚动 7 天窗口，"
+                    "sub": gpu_stale + "Silicon Data 各卡型小时租赁基准价。公开层只放出滚动 7 天窗口，"
                            "本仓库每日抓取累积，历史自 2026-08-23 起在此逐日生长。",
                     "unit": "美元/小时", "freq": "日频",
                     "source": "Silicon Data · SiliconIndex", "data": p_gpu},
