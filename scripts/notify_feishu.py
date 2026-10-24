@@ -130,8 +130,9 @@ def compose(dash, report, build_failed):
     curve_line("名义利率曲线", "名义")
     curve_line("实际利率曲线", "实际")
     curve_line("盈亏平衡", "盈亏平衡")
-    if any(l.startswith("实际") and "1y*" in l for l in lines):
-        lines.append("　1y* 无市场化来源，是名义减克利夫兰联储模型预期派生的，口径与其余档不同")
+    if any(l.startswith("实际") and "*" in l for l in lines):
+        lines.append("　带*的 6m / 1y 无市场化来源，是名义减克利夫兰联储模型 1 年预期"
+                     "派生的，口径与其余档不同")
     erp = g("隐含股权风险溢价")
     ep = dash.get("erp_pctiles")
     if ep and ep.get("p_monthly") is not None:

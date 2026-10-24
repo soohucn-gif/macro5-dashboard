@@ -150,8 +150,13 @@ def fetch_real_rate():
         序列最短就是 5 年，短端只有拟合曲线给。日频，但该文件比 FRED 滞后约一周。
       · 1 年 —— 没有任何市场化来源，只能派生 = 名义 − 克利夫兰联储模型的 1 年通胀
         预期（月频，当月值套到当月每一天）。单独叫 real1_derived，面板里另行标注。
-      · 6 月 —— **没有实际利率**。TIPS 拟合不到 2 年以下（CPI 季节性与持有期效应
-        会把短端拟歪），也没有 6 个月的通胀预期序列。只报名义。
+      · 6 月 —— 同样只能派生，而且**连配套期限的预期都没有**：克利夫兰联储那套
+        最短就是 1 年。所以 real6mo_derived = DGS6MO − EXPINF1YR，用 1 年预期近似
+        6 个月。误差量级实测约 0.1pp（EXPINF1YR 与 EXPINF2YR 2016 年以来 |差| 中位
+        0.16pp，折半），通胀拐点处可到 0.3pp。要的是政策松紧的方向，不是小数点。
+
+    派生那两档（6 月、1 年）在表里不参与盈亏平衡：名义减实际恰好等于当初减去的
+    那个预期，是恒等式不是读数。
 
     同表存盈亏平衡通胀：5/10 年用 FRED 的 T5YIE/T10YIE，2/3 年用 GSW 的 BKEVEN，
     于是每一档都能逐日验算「实际 ≈ 名义 − 盈亏平衡」。T5YIFR 是「5年后的5年」远期
@@ -173,12 +178,16 @@ def fetch_real_rate():
             if nom is not None and brk is not None:
                 r["implied_real" + tenor] = round(nom - brk, 2)
         e1 = exp1.get(d[:7])
-        if r.get("dgs1") is not None and e1 is not None:
-            r["real1_derived"] = round(r["dgs1"] - e1, 2)
+        if e1 is not None:
+            if r.get("dgs1") is not None:
+                r["real1_derived"] = round(r["dgs1"] - e1, 2)
+            if r.get("dgs6mo") is not None:
+                r["real6mo_derived"] = round(r["dgs6mo"] - e1, 2)
         rows.append(r)
     _gsw_selfcheck(rows)
     fields = ["date", "dgs6mo", "dgs1", "dgs2", "dgs3", "dgs5", "dgs10", "dgs30",
-              "real1_derived", "tipsy2", "tipsy3", "dfii5", "dfii10", "dfii30",
+              "real6mo_derived", "real1_derived",
+              "tipsy2", "tipsy3", "dfii5", "dfii10", "dfii30",
               "bkeven2", "bkeven3", "t5yie", "t10yie", "t5yifr",
               "implied_real5", "implied_real10"]
     n, added = merge_csv(os.path.join(DATA, "real_rates.csv"), fields, ("date",), rows)
