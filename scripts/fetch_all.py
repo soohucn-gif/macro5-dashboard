@@ -2,7 +2,7 @@
 """五大类数据抓取。每类独立 try，一类挂掉不影响其余，最后汇总退出码。
 
 产出（全部 merge 语义，绝不丢历史）：
-  data/real_rates.csv      5/10/30年期实际利率(TIPS)与名义利率      日频  FRED
+  data/real_rates.csv      6月/1/2/3/5/10/30年期名义利率与实际利率   日频  FRED + 美联储GSW
   data/inflation_expectations.csv  通胀预期：市场 vs 消费者         月频  FRED + 纽约联储
   data/equity_indices.csv  标普500 / 纳指综合 / 纳指100             日频  FRED
   data/gold.csv            LBMA 伦敦金定盘价 USD/oz（主）/ gold-api.com XAU现货（备）  日频
@@ -32,8 +32,22 @@ FULL = "--full" in sys.argv
 
 # ------------------------------------------------------- 1. 实际利率期限结构
 REAL_SERIES = {"dfii5": "DFII5", "dfii10": "DFII10", "dfii30": "DFII30",
+               "dgs6mo": "DGS6MO", "dgs1": "DGS1", "dgs2": "DGS2", "dgs3": "DGS3",
                "dgs5": "DGS5", "dgs10": "DGS10", "dgs30": "DGS30",
                "t5yie": "T5YIE", "t10yie": "T10YIE", "t5yifr": "T5YIFR"}
+
+# 美联储 GSW 的 TIPS 拟合曲线（Gurkaynak-Sack-Wright，staff 研究数据，非官方统计发布）。
+# 要它只为一件事：**2 年和 3 年期的实际利率**。TIPS 固定期限序列最短就是 5 年，
+# DFII2 / DFII3 在 FRED 根本不存在，短端实际利率只有这条拟合曲线给得出。
+# 口径差已量过（2016 年以来）：TIPSY05 − DFII5 中位 −0.017pp、p95 0.11pp，
+# 零息拟合与附息固定期限的差小到可以同图并列。
+GSW_TIPS_URL = "https://www.federalreserve.gov/data/yield-curve-tables/feds200805.csv"
+GSW_COLS = {"tipsy2": "TIPSY02", "tipsy3": "TIPSY03",
+            "bkeven2": "BKEVEN02", "bkeven3": "BKEVEN03"}
+# TIPSY + BKEVEN 应当重建出同期限名义利率；实测与 DGS2/DGS3 中位差 0.000pp、p95 0.06pp。
+# 超过 0.30pp 就不是口径差，是列对错了或文件改版。
+GSW_CHECK_THR = 0.30
+_ISO = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
 @functools.lru_cache(maxsize=None)
@@ -49,20 +63,108 @@ def _zip(raw):
     return zipfile.ZipFile(io.BytesIO(raw))
 
 
+def _gsw_header(raw):
+    """GSW CSV 开头若干行是免责声明，表头靠 TIPSY02 认，不写死行号。→ {字段: 列号}"""
+    txt = raw.decode("utf-8", errors="ignore").splitlines()
+    hdr = next((l for l in txt if "TIPSY02" in l and "Date" in l), None)
+    if hdr is None:
+        raise ValueError("GSW: 没找到表头（取回的多半是错误页）")
+    cols = [c.strip() for c in hdr.split(",")]
+    idx = {k: cols.index(v) for k, v in GSW_COLS.items() if v in cols}
+    if len(idx) != len(GSW_COLS):
+        raise ValueError("GSW 表头缺列：%s" % sorted(set(GSW_COLS) - set(idx)))
+    return idx
+
+
+def _gsw_rows(raw, idx):
+    """GSW CSV（整份或 Range 取回的尾段）→ {date: {tipsy2, tipsy3, bkeven2, bkeven3}}。
+
+    只认列 0 是 ISO 日期的行，于是免责声明、表头、以及 Range 尾段开头那条
+    半截记录都会被自然丢掉，不用特判取回来的是整份还是片段。
+    """
+    out = {}
+    for line in raw.decode("utf-8", errors="ignore").splitlines():
+        a = line.split(",")
+        d = a[0].strip()
+        if not _ISO.fullmatch(d):
+            continue
+        rec = {}
+        for k, j in idx.items():
+            v = a[j].strip() if j < len(a) else ""
+            if v and v.upper() != "NA":
+                try:
+                    rec[k] = round(float(v), 2)
+                except ValueError:
+                    pass
+        if rec:
+            out[d] = rec
+    if not out:
+        raise ValueError("GSW: 片段里没有可用数据行")
+    return out
+
+
+def _gsw_tips():
+    """取 GSW 的 2/3 年期实际利率与盈亏平衡。
+
+    整份 15MB，日更没必要每天拖一遍：先 Range 取前 80KB 定列号，再取尾部 2MB
+    （约覆盖最近三年）。服务器不支持 Range 就会返回 200 整份，`_gsw_rows` 照样
+    解析得了，不用特判。本地还没有 2 年期实际利率时必须整份取 —— 否则历史只会
+    从最近三年开始长，`--full` 也就白加了。
+    """
+    have = any(r.get("tipsy2") for r in read_csv(os.path.join(DATA, "real_rates.csv")))
+    if FULL or not have:
+        return http_get(GSW_TIPS_URL, timeout=180,
+                        parse=lambda raw: _gsw_rows(raw, _gsw_header(raw)))
+    idx = http_get(GSW_TIPS_URL, headers={"Range": "bytes=0-80000"}, parse=_gsw_header)
+    return http_get(GSW_TIPS_URL, headers={"Range": "bytes=-2000000"},
+                    parse=lambda raw: _gsw_rows(raw, idx))
+
+
+def _gsw_selfcheck(rows):
+    """TIPSY + BKEVEN 必须重建出 FRED 的同期限名义利率，否则宁可报错也不入库。
+
+    容忍零星不符（节假日日历差、FRED 事后修订），但列错位会让近乎每天都超阈值。
+    """
+    bad = []
+    for r in rows[-250:]:
+        for t in ("2", "3"):
+            real, be, nom = r.get("tipsy" + t), r.get("bkeven" + t), r.get("dgs" + t)
+            if None in (real, be, nom):
+                continue
+            if abs(real + be - nom) > GSW_CHECK_THR:
+                bad.append((r["date"], t + "y", round(real + be - nom, 3)))
+    if len(bad) > 5:
+        raise RuntimeError("GSW 与 FRED 名义利率对不上：近 250 个交易日 %d 次超 %.2fpp，"
+                           "前几例 %s —— 八成是文件改版或列错位" % (len(bad), GSW_CHECK_THR, bad[:3]))
+
+
 def fetch_real_rate():
-    """FRED：DFII5 / DFII10 / DFII30 —— 5、10、30 年期通胀保值债券(TIPS)收益率，
-    也就是市场对各期限**实际利率**的直接定价。
+    """名义与实际利率的完整期限结构：6月 / 1 / 2 / 3 / 5 / 10 / 30 年。
 
-    同表存对应期限的名义利率(DGS*)与盈亏平衡通胀(T5YIE/T10YIE)，满足
-    实际 ≈ 名义 − 盈亏平衡通胀，可逐日交叉验算。T5YIFR 是「5年后的5年」远期盈亏平衡，
-    剔除了未来五年的短期通胀噪音，是市场长期通胀预期最干净的读数。
+    **名义**七档齐全，全部来自 FRED 的 DGS 系列，日频。
 
-    注意 DFII30 只有 2010-02 起 —— 30 年期 TIPS 在 2001 停发、2010 才重启。
+    **实际利率分三种口径，不能混为一谈**：
+      · 5 / 10 / 30 年 —— DFII5/10/30，TIPS 固定期限收益率，市场直接定价，最硬。
+        DFII30 只有 2010-02 起：30 年 TIPS 2001 年停发、2010 年才重启。
+      · 2 / 3 年 —— 美联储 GSW 的 TIPS 拟合曲线（见 GSW_TIPS_URL）。TIPS 固定期限
+        序列最短就是 5 年，短端只有拟合曲线给。日频，但该文件比 FRED 滞后约一周。
+      · 1 年 —— 没有任何市场化来源，只能派生 = 名义 − 克利夫兰联储模型的 1 年通胀
+        预期（月频，当月值套到当月每一天）。单独叫 real1_derived，面板里另行标注。
+      · 6 月 —— **没有实际利率**。TIPS 拟合不到 2 年以下（CPI 季节性与持有期效应
+        会把短端拟歪），也没有 6 个月的通胀预期序列。只报名义。
+
+    同表存盈亏平衡通胀：5/10 年用 FRED 的 T5YIE/T10YIE，2/3 年用 GSW 的 BKEVEN，
+    于是每一档都能逐日验算「实际 ≈ 名义 − 盈亏平衡」。T5YIFR 是「5年后的5年」远期
+    盈亏平衡，剔除了未来五年的短期通胀噪音，是市场长期通胀预期最干净的读数。
     """
     merged = {}
     for col, sid in REAL_SERIES.items():
         for d, v in _fred(sid):
             merged.setdefault(d, {"date": d})[col] = round(v, 2)
+    for d, rec in _gsw_tips().items():
+        merged.setdefault(d, {"date": d}).update(rec)
+    # 1 年期派生实际利率用的月频预期：键按年月取，当月每一天都用同一个预期值
+    exp1 = {d[:7]: v for d, v in _fred("EXPINF1YR")}
     rows = []
     for d in sorted(merged):
         r = merged[d]
@@ -70,9 +172,15 @@ def fetch_real_rate():
             nom, brk = r.get("dgs" + tenor), r.get(be)
             if nom is not None and brk is not None:
                 r["implied_real" + tenor] = round(nom - brk, 2)
+        e1 = exp1.get(d[:7])
+        if r.get("dgs1") is not None and e1 is not None:
+            r["real1_derived"] = round(r["dgs1"] - e1, 2)
         rows.append(r)
-    fields = ["date", "dfii5", "dfii10", "dfii30", "dgs5", "dgs10", "dgs30",
-              "t5yie", "t10yie", "t5yifr", "implied_real5", "implied_real10"]
+    _gsw_selfcheck(rows)
+    fields = ["date", "dgs6mo", "dgs1", "dgs2", "dgs3", "dgs5", "dgs10", "dgs30",
+              "real1_derived", "tipsy2", "tipsy3", "dfii5", "dfii10", "dfii30",
+              "bkeven2", "bkeven3", "t5yie", "t10yie", "t5yifr",
+              "implied_real5", "implied_real10"]
     n, added = merge_csv(os.path.join(DATA, "real_rates.csv"), fields, ("date",), rows)
     return "real_rates", n, added, rows[-1]["date"] if rows else ""
 

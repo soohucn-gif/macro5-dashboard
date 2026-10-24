@@ -94,7 +94,9 @@ svg{display:block;width:100%;height:auto;touch-action:pan-y}
 .xen{color:var(--muted);font-size:10.5px;display:block;margin-top:1px}
 .xbar{height:4px;border-radius:2px;background:var(--chip);margin-top:4px;overflow:hidden}
 .xbar span{display:block;height:100%;border-radius:2px;background:var(--c1)}
-.xsec .xrow:first-child .xbar span{background:var(--c2)}
+/* 榜单类横截面首行是「第一名」，单独着色；利率曲线这类没有排名的传 flat 关掉，
+   否则「6月期」会被无端标成重点 */
+.xsec:not(.flat) .xrow:first-child .xbar span{background:var(--c2)}
 .xmonth{display:inline-block;background:var(--chip);border-radius:5px;padding:1px 7px;
   font-size:11px;color:var(--muted);margin-left:8px;font-variant-numeric:tabular-nums}
 .src{font-size:11.5px;color:var(--muted);margin-top:8px;
@@ -449,6 +451,7 @@ Object.keys(D.panels).forEach(function(key){
   });
   var xs=card.querySelector(".xsec");
   if(p.tables && p.tables.length){
+    if(p.flat) xs.classList.add("flat");
     card.querySelector("h2").insertAdjacentHTML("beforeend",
       '<span class="xmonth">当期截面 '+esc(p.month||"")+'</span>');
     xs.innerHTML = p.tables.map(function(t){

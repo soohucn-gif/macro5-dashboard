@@ -38,7 +38,8 @@ BJT = datetime.timezone(datetime.timedelta(hours=8))
 # 否则"实际+22bp、名义+22bp"两条说的是同一件事，占版面还不给信息。
 TENORS = [("30y", "30年期实际利率", "30年期名义利率"),
           ("10y", "10年期实际利率", "10年期名义利率"),
-          ("5y", "5年期实际利率", "5年期名义利率")]
+          ("5y", "5年期实际利率", "5年期名义利率"),
+          ("2y", "2年期实际利率", "2年期名义利率")]
 RATE_THR = 0.10          # pp
 BE_THR = 0.05            # pp，盈亏平衡自身的变动阈值
 
@@ -106,20 +107,31 @@ def compose(dash, report, build_failed):
     def g(name):
         return k.get(name)
 
-    r30, r10, r5 = g("30年期实际利率"), g("10年期实际利率"), g("5年期实际利率")
-    n30, n10, n5 = g("30年期名义利率"), g("10年期名义利率"), g("5年期名义利率")
-    if r30 and r10 and r5:
-        lines.append("实际 30y %.2f%% / 10y %.2f%% / 5y %.2f%%  (%s)"
-                     % (r30["value"], r10["value"], r5["value"], r10["date"][5:]))
-    if n30 and n10 and n5:
-        lines.append("名义 30y %.2f%% / 10y %.2f%% / 5y %.2f%%"
-                     % (n30["value"], n10["value"], n5["value"]))
-    # 盈亏平衡通胀 = 名义 − 实际，用同一天的 KPI 现算，避免月频那条序列的滞后
-    if n10 and r10 and n10["date"] == r10["date"]:
-        be10 = n10["value"] - r10["value"]
-        be30 = (n30["value"] - r30["value"]) if (n30 and r30) else None
-        lines.append("盈亏平衡 10y %.2f%%%s" %
-                     (be10, "" if be30 is None else " / 30y %.2f%%" % be30))
+    # 三条曲线直接读面板的当期横截面，不再拿 KPI 现拼：横截面已经保证「同一天的
+    # 点才进同一条曲线」，而 KPI 是各序列各自的最新值，混起来播出去就是一条假曲线。
+    SHORT = {"6月": "6m", "1年": "1y", "2年": "2y", "3年": "3y",
+             "5年": "5y", "10年": "10y", "30年": "30y"}
+
+    def curve_line(title_prefix, label):
+        t = next((x for x in (dash.get("panels", {}).get("real_rate", {}).get("tables") or [])
+                  if x.get("title", "").startswith(title_prefix)), None)
+        if not t:
+            return
+        segs = []
+        for i in t["items"]:
+            if i.get("pct") is None:
+                continue
+            star = "*" if i["label"].endswith("*") else ""
+            segs.append("%s%s %.2f" % (SHORT.get(i["label"].rstrip("*"), i["label"]),
+                                       star, i["pct"]))
+        if segs:
+            lines.append("%s %s  (%s)" % (label, " ".join(segs), t["note"][5:10]))
+
+    curve_line("名义利率曲线", "名义")
+    curve_line("实际利率曲线", "实际")
+    curve_line("盈亏平衡", "盈亏平衡")
+    if any(l.startswith("实际") and "1y*" in l for l in lines):
+        lines.append("　1y* 无市场化来源，是名义减克利夫兰联储模型预期派生的，口径与其余档不同")
     erp = g("隐含股权风险溢价")
     ep = dash.get("erp_pctiles")
     if ep and ep.get("p_monthly") is not None:
@@ -157,8 +169,11 @@ def compose(dash, report, build_failed):
         dn = nx.get("chg_30") if nx else None
         if dr is None and dn is None:
             continue
-        # 盈亏平衡的变动 = 名义变动 − 实际变动
-        dbe = (dn - dr) if (dr is not None and dn is not None) else None
+        # 盈亏平衡的变动 = 名义变动 − 实际变动。但两条腿必须锚在同一天：
+        # 2 年期实际走美联储 GSW，比 FRED 的名义滞后约一周，两个 30 日窗口错开
+        # 几个交易日，相减得到的「通胀预期变动」就是窗口差造成的噪音，不是信号。
+        same_day = bool(rx and nx and rx.get("date") == nx.get("date"))
+        dbe = (dn - dr) if (dr is not None and dn is not None and same_day) else None
         if dr is not None and abs(dr) >= RATE_THR:
             tail = ""
             if dbe is not None and abs(dbe) >= BE_THR:

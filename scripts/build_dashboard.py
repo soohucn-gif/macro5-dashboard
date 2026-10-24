@@ -48,6 +48,20 @@ def last_valid(p, label):
     return None, None
 
 
+def at_date(p, label, date):
+    """取某序列在**指定日期**的值，该日无值就返回 None。
+
+    期限结构必须是同一天的横截面，所以这里刻意不向前回退找值 —— 回退会把
+    不同交易日的点拼成一条假曲线。
+    """
+    try:
+        i = p["dates"].index(date)
+    except ValueError:
+        return None
+    vals = p["series"].get(label)
+    return vals[i] if vals else None
+
+
 def change(p, label, days):
     """相对 N 个自然日前最近一个有效点的变动 (绝对值差, 百分比)。"""
     d, cur = last_valid(p, label)
@@ -77,7 +91,13 @@ def build():
     fms_crowded = read_csv(os.path.join(DATA, "bofa_fms_crowded.csv"))
     fms_contra = read_csv(os.path.join(DATA, "bofa_fms_contrarian.csv"))
 
-    p_rr = panel(rr, {"dfii5": "5年期实际利率", "dgs5": "5年期名义利率",
+    # 七档期限，短→长。实际利率三种口径：TIPS 固定期限(5/10/30)、GSW 拟合(2/3)、
+    # 派生(1 年，名义 − 克利夫兰联储模型预期)。6 月期没有实际利率，只有名义。
+    p_rr = panel(rr, {"dgs6mo": "6月期名义利率",
+                      "real1_derived": "1年期实际利率(派生)", "dgs1": "1年期名义利率",
+                      "tipsy2": "2年期实际利率", "dgs2": "2年期名义利率",
+                      "tipsy3": "3年期实际利率", "dgs3": "3年期名义利率",
+                      "dfii5": "5年期实际利率", "dgs5": "5年期名义利率",
                       "dfii10": "10年期实际利率", "dgs10": "10年期名义利率",
                       "dfii30": "30年期实际利率", "dgs30": "30年期名义利率"})
     p_ie = panel(ie, {"be10y": "市场 · 10年盈亏平衡", "fwd5y5y": "市场 · 5年后5年远期",
@@ -195,6 +215,49 @@ def build():
             gpu_stale = ("　⚠️ 上游最后放数 %s，已 %d 天未更新（Silicon Data 当期未放数）。"
                          % (p_gpu["dates"][-1], age))
 
+    # 利率期限结构的当期横截面：七档并排看曲线形状。倒挂、陡平、哪一段在动，
+    # 看横截面比看 13 条时间序列直观得多。
+    # 两个参考日刻意分开：名义取最新交易日，实际取「2 年期有值」的最新交易日
+    # —— 美联储 GSW 那个文件比 FRED 滞后约一周，混成一天就是假曲线。
+    RATE_TENORS = [("6月", "6月期名义利率", None),
+                   ("1年", "1年期名义利率", "1年期实际利率(派生)"),
+                   ("2年", "2年期名义利率", "2年期实际利率"),
+                   ("3年", "3年期名义利率", "3年期实际利率"),
+                   ("5年", "5年期名义利率", "5年期实际利率"),
+                   ("10年", "10年期名义利率", "10年期实际利率"),
+                   ("30年", "30年期名义利率", "30年期实际利率")]
+    nom_date, _ = last_valid(p_rr, "10年期名义利率")
+    real_date, _ = last_valid(p_rr, "2年期实际利率")
+    rate_tables = []
+    if nom_date:
+        rate_tables.append({
+            "title": "名义利率曲线",
+            "note": "%s · FRED DGS 系列" % nom_date,
+            "scale": 6,
+            "items": [{"label": lab, "pct": at_date(p_rr, nk, nom_date)}
+                      for lab, nk, _ in RATE_TENORS]})
+    if real_date:
+        rate_tables.append({
+            "title": "实际利率曲线",
+            "note": ("%s · 5/10/30年=TIPS 固定期限，2/3年=美联储 GSW 拟合，"
+                     "1年=派生（名义 − 克利夫兰联储模型预期），6月期无此数据"
+                     % real_date),
+            "scale": 6,
+            "items": [{"label": lab + ("*" if lab == "1年" else ""),
+                       "pct": (None if rk is None else at_date(p_rr, rk, real_date))}
+                      for lab, _, rk in RATE_TENORS]})
+        # 盈亏平衡 = 同一天的名义 − 实际。必须同日相减，跨日相减得到的是噪音。
+        be_items = []
+        for lab, nk, rk in RATE_TENORS:
+            nv = at_date(p_rr, nk, real_date)
+            rv = None if rk is None else at_date(p_rr, rk, real_date)
+            be_items.append({"label": lab + ("*" if lab == "1年" else ""),
+                             "pct": (None if None in (nv, rv) else round(nv - rv, 2))})
+        rate_tables.append({
+            "title": "盈亏平衡通胀（名义 − 实际）",
+            "note": "%s · 同日相减。1年期带*的那档是模型口径，与其余档不同源" % real_date,
+            "scale": 6, "items": be_items})
+
     # 跨资产归一：十年窗口内各自首个有效值 = 100
     def rebase(p, label, out_label):
         vals = p["series"].get(label)
@@ -245,6 +308,11 @@ def build():
     add_kpi("10年期名义利率", "%", p_rr, "10年期名义利率", "FRED DGS10 · 日频", True, True)
     add_kpi("5年期实际利率", "%", p_rr, "5年期实际利率", "FRED DFII5 · 日频", True, True)
     add_kpi("5年期名义利率", "%", p_rr, "5年期名义利率", "FRED DGS5 · 日频", True, True)
+    # 2 年期是政策预期最敏感的一档。实际利率走美联储 GSW 拟合曲线，比 FRED 滞后约
+    # 一周，所以 daily 的陈旧判定对它会常态触发 —— 这里不传 daily，改在 note 里写明。
+    add_kpi("2年期实际利率", "%", p_rr, "2年期实际利率",
+            "美联储 GSW 拟合 · 日频（较 FRED 滞后约一周）", True)
+    add_kpi("2年期名义利率", "%", p_rr, "2年期名义利率", "FRED DGS2 · 日频", True, True)
     add_kpi("市场通胀预期(10年)", "%", p_ie, "市场 · 10年盈亏平衡", "FRED T10YIE · 月末", True)
     add_kpi("消费者通胀预期(5年)", "%", p_ie, "消费者 · 纽约联储5年",
             "纽约联储 SCE 中位数 · 月频", True)
@@ -274,20 +342,44 @@ def build():
                          "p_monthly": pctile(m_erp, cur_erp)}
                         if (cur_erp is not None and m_erp) else None),
         "panels": {
-            "real_rate": {"title": "① 利率期限结构：实际 vs 名义（5 / 10 / 30 年）",
-                          "sub": "实线是 TIPS 实际利率，虚线是同期限名义国债利率，同期限同色。"
+            "real_rate": {"title": "① 利率期限结构：实际 vs 名义"
+                                   "（6月 / 1 / 2 / 3 / 5 / 10 / 30 年）",
+                          "sub": "实线是实际利率，虚线是同期限名义利率，同期限同色。"
                                  "两条线之间的竖直间距就是该期限的盈亏平衡通胀 —— "
                                  "名义在涨而间距不变，涨的就是实际利率（钱本身的价格）；"
                                  "间距跟着张开，才是通胀预期在推。"
-                                 "长端实际利率是压估值的那一根，三个期限一起看才知道是"
-                                 "曲线整体抬升还是只有长端在动。"
-                                 "30 年期只有 2010-02 起：30 年 TIPS 2001 年停发、2010 年才重启。",
+                                 "默认只画 2 / 5 / 10 / 30 年，点图例可开关任意一档。"
+                                 "下方横截面是当期的曲线形状，看倒挂与陡平用它。"
+                                 "　实际利率有三种口径，级别不同："
+                                 "5 / 10 / 30 年是 TIPS 固定期限收益率，市场直接定价，最硬"
+                                 "（30 年期只有 2010-02 起，30 年 TIPS 2001 年停发、2010 年重启）；"
+                                 "2 / 3 年是美联储 GSW 的 TIPS 拟合曲线 —— TIPS 固定期限序列"
+                                 "最短就是 5 年，短端只有拟合曲线给，代价是该文件比 FRED 滞后约一周；"
+                                 "1 年期没有任何市场化来源，只能用名义减克利夫兰联储模型的 1 年"
+                                 "通胀预期派生，标了星号；6 月期连派生都做不了，只报名义。"
+                                 "　派生口径和市场口径在同一期限上历史是吻合的"
+                                 "（2 年期 2016 年以来中位差 −0.05pp），所以 1 年期那个点偏低"
+                                 "不是口径毛病：当下克利夫兰模型的近端通胀预期比市场的 2 年"
+                                 "盈亏平衡高出约 0.6pp，短端这段落差是这个分歧，不是曲线形状。",
                           "unit": "%", "freq": "日频",
-                          "colors": {"5年期实际利率": 0, "5年期名义利率": 0,
-                                     "10年期实际利率": 1, "10年期名义利率": 1,
-                                     "30年期实际利率": 2, "30年期名义利率": 2},
-                          "dash": ["5年期名义利率", "10年期名义利率", "30年期名义利率"],
-                          "source": "FRED · DFII5/10/30（实际）· DGS5/10/30（名义）",
+                          "month": nom_date,
+                          "tables": rate_tables,
+                          "flat": True,          # 曲线没有排名，首行不着强调色
+                          "colors": {"6月期名义利率": 0,
+                                     "1年期实际利率(派生)": 1, "1年期名义利率": 1,
+                                     "2年期实际利率": 2, "2年期名义利率": 2,
+                                     "3年期实际利率": 3, "3年期名义利率": 3,
+                                     "5年期实际利率": 4, "5年期名义利率": 4,
+                                     "10年期实际利率": 5, "10年期名义利率": 5,
+                                     "30年期实际利率": 6, "30年期名义利率": 6},
+                          "dash": ["6月期名义利率", "1年期名义利率", "2年期名义利率",
+                                   "3年期名义利率", "5年期名义利率", "10年期名义利率",
+                                   "30年期名义利率"],
+                          "hidden": ["6月期名义利率", "1年期实际利率(派生)",
+                                     "1年期名义利率", "3年期实际利率", "3年期名义利率"],
+                          "source": "FRED · DGS6MO/1/2/3/5/10/30（名义）· DFII5/10/30（实际）"
+                                    "；美联储 GSW feds200805（2/3 年实际）"
+                                    "；FRED EXPINF1YR（1 年派生）",
                           "data": p_rr},
             "infexp": {"title": "② 通胀预期：市场 vs 消费者",
                        "sub": "两个口径长期系统性打架，必须分开看。市场（TIPS 盈亏平衡）是"
