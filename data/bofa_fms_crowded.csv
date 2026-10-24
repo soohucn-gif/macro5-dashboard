@@ -69,8 +69,8 @@ month,rank,trade,trade_cn,pct
 2026-09,4,Long global banks,做多全球银行股,6
 2026-09,5,Short US dollar,做空美元,5
 2026-09,6,Long Gold,做多黄金,5
-2026-10,1,Long global semiconductors,做多全球半导体,45
-2026-10,2,Short Treasuries,做空美债,27
-2026-10,3,Long Magnificent 7,做多美股七巨头,16
-2026-10,4,Long US dollar,做多美元,5
-2026-10,5,Long global banks,做多全球银行股,3
+2026-10,1,Long global semiconductors,做多全球半导体,45.0
+2026-10,2,Short Treasuries,做空美债,27.0
+2026-10,3,Long Magnificent 7,做多美股七巨头,16.0
+2026-10,4,Long US dollar,做多美元,5.0
+2026-10,5,Long global banks,做多全球银行股,3.0

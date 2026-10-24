@@ -228,16 +228,16 @@ month,kind,rank,item,item_cn,pct
 2026-09,most_underweight,8,Eurozone,,
 2026-10,contrarian,1,Long bonds,,
 2026-10,most_underweight,1,Consumer discretionary,,
-2026-10,sector_underweight,1,Consumer discretionary,,-34
-2026-10,tail_risk,1,Disorderly rise in bond yields,债券收益率无序上行,31
+2026-10,sector_underweight,1,Consumer discretionary,,-34.0
+2026-10,tail_risk,1,Disorderly rise in bond yields,债券收益率无序上行,31.0
 2026-10,contrarian,2,Long REITs,,
-2026-10,tail_risk,2,AI bubble,AI 泡沫,23
+2026-10,tail_risk,2,AI bubble,AI 泡沫,23.0
 2026-10,contrarian,3,Long consumer,,
-2026-10,tail_risk,3,Second wave of inflation,第二波通胀,20
+2026-10,tail_risk,3,Second wave of inflation,第二波通胀,20.0
 2026-10,contrarian,4,Short equities,,
-2026-10,tail_risk,4,Hyperscaler credit event,超大规模云厂商信用事件,11
+2026-10,tail_risk,4,Hyperscaler credit event,超大规模云厂商信用事件,11.0
 2026-10,contrarian,5,Short tech,,
-2026-10,tail_risk,5,Geopolitical conflict,地缘冲突,9
+2026-10,tail_risk,5,Geopolitical conflict,地缘冲突,9.0
 2026-10,contrarian,6,Short banks,,
-2026-10,tail_risk,6,Democratic sweep in US midterms,美国中期选举民主党全胜,5
+2026-10,tail_risk,6,Democratic sweep in US midterms,美国中期选举民主党全胜,5.0
 2026-10,contrarian,7,Short EM,,

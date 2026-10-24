@@ -93,11 +93,32 @@ def validate(p):
     return srcs
 
 
-def merge(path, fields, rows_for_month, month):
-    """同月旧行整体替换，其余月份原样保留，按月份排序落盘。"""
-    kept = [r for r in read_csv(path) if r.get("month") != month]
-    out = kept + [{k: ("" if r.get(k) is None else str(r.get(k))) for k in fields}
-                  for r in rows_for_month]
+def merge(path, fields, rows_for_month, month, keep_existing_scalars=False):
+    """同月旧行整体替换，其余月份原样保留，按月份排序落盘。
+
+    `keep_existing_scalars` 给**单行表**（bofa_fms.csv）用：重抓同一个月时，
+    新 payload 没给值的字段保留旧值，给了值的照常覆盖。
+
+    为什么需要：2026-10-24 重抓那次，模型这回没找到 `net_ow_us_equities`，
+    整体替换就把上一次已经双源核实过的 11.0 抹掉了。**「这次没找到」不是
+    「上次那个值错了」的证据**，不该当成删除依据。排名列表（拥挤交易、
+    尾部风险）仍是整体替换 —— 那是有序集合，部分合并只会得到一个四不像的榜单。
+    """
+    old_rows = read_csv(path)
+    kept = [r for r in old_rows if r.get("month") != month]
+    new_rows = [{k: ("" if r.get(k) is None else str(r.get(k))) for k in fields}
+                for r in rows_for_month]
+    if keep_existing_scalars and len(new_rows) == 1:
+        prev = next((r for r in old_rows if r.get("month") == month), None)
+        if prev:
+            filled = []
+            for k, v in new_rows[0].items():
+                if str(v).strip() == "" and str(prev.get(k, "")).strip() != "":
+                    new_rows[0][k] = prev[k]
+                    filled.append(k)
+            if filled:
+                print("  保留上一版已有、本次未取到的字段：%s" % "、".join(filled))
+    out = kept + new_rows
     out.sort(key=lambda r: (r.get("month", ""), int(r.get("rank") or 0),
                             r.get("kind", "")))
     with open(path, "w", newline="", encoding="utf-8") as f:
@@ -152,7 +173,8 @@ def main():
         contra.append({"month": month, "kind": "sector_underweight", "rank": i,
                        "item": t.get("name", ""), "item_cn": "", "pct": t.get("pct", "")})
 
-    n1 = merge(os.path.join(DATA, "bofa_fms.csv"), HEAD_FIELDS, head, month)
+    n1 = merge(os.path.join(DATA, "bofa_fms.csv"), HEAD_FIELDS, head, month,
+               keep_existing_scalars=True)
     n2 = merge(os.path.join(DATA, "bofa_fms_crowded.csv"), CROWDED_FIELDS, crowded, month)
     n3 = merge(os.path.join(DATA, "bofa_fms_contrarian.csv"), CONTRA_FIELDS, contra, month)
     print("已写入 %s：拥挤交易 %d 条、反向/尾部风险 %d 条、置信度 %s"
