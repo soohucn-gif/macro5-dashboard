@@ -30,6 +30,10 @@ on:
         description: "FMS 试跑：忽略日期/已入库两道闸门，只打印 payload 不写库"
         type: boolean
         default: false
+      fms_force:
+        description: "FMS 强制重抓并**覆盖**当月（按月幂等替换，用于补齐残缺的期次）"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -92,7 +96,9 @@ jobs:
             python3 scripts/fms_api.py --force --dry-run    # 只打印，不写库
             exit 0
           fi
-          python3 scripts/fms_api.py --out /tmp/fms_payload.json
+          FORCE=""
+          if [ "${{ github.event.inputs.fms_force }}" = "true" ]; then FORCE="--force"; fi
+          python3 scripts/fms_api.py $FORCE --out /tmp/fms_payload.json
           if [ -s /tmp/fms_payload.json ]; then
             python3 scripts/append_fms.py /tmp/fms_payload.json
             python3 scripts/build_dashboard.py      # 新一期进库了，重建一次
