@@ -69,6 +69,12 @@ def read_csv(path):
 def merge_csv(path, fields, key, new_rows):
     """按 key 合并进已有 CSV：新值覆盖同 key 老值，其余保留，按 key 排序落盘。
 
+    **空值不覆盖已有值。** 同一个 key 上，新行某字段为空而旧行有值时保留旧值。
+    一张表里各列的覆盖范围常常不一样，而且日更只取增量：利率表里 FRED 那几列
+    回到 1962 年，美联储 GSW 那几列日更只取最近三年的尾段 —— 整行替换会把
+    本轮没取到的字段全抹成空（实测把 tipsy2 从 1999 年起的 6942 行砍到 927 行）。
+    **「这次没取到」不是「上次那个值错了」**，不该当删除依据。真要清空得显式写别的值。
+
     key 是字段名元组。返回 (总行数, 新增行数)。
     """
     old = read_csv(path)
@@ -76,7 +82,13 @@ def merge_csv(path, fields, key, new_rows):
     before = len(idx)
     for r in new_rows:
         r = {k: ("" if r.get(k) is None else str(r.get(k))) for k in fields}
-        idx[tuple(r.get(k, "") for k in key)] = r
+        kk = tuple(r.get(k, "") for k in key)
+        prev = idx.get(kk)
+        if prev:
+            for fld in fields:
+                if r[fld] == "" and str(prev.get(fld, "")).strip() != "":
+                    r[fld] = prev[fld]
+        idx[kk] = r
     rows = [idx[k] for k in sorted(idx)]
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", newline="", encoding="utf-8") as f:
