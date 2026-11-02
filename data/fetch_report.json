@@ -1,5 +1,5 @@
 {
-  "run_at_utc": "2026-11-02T05:58:58+00:00",
+  "run_at_utc": "2026-11-02T21:47:47+00:00",
   "full": false,
   "jobs": [
     {
@@ -22,9 +22,9 @@
       "job": "equity_indices",
       "label": "股指",
       "ok": true,
-      "rows": 14054,
-      "added": 0,
-      "last_date": "2026-10-29"
+      "rows": 14055,
+      "added": 1,
+      "last_date": "2026-10-30"
     },
     {
       "job": "gold",
@@ -47,17 +47,17 @@
       "job": "gpu_rental",
       "label": "GPU租赁指数",
       "ok": true,
-      "rows": 497,
-      "added": 0,
-      "last_date": "2026-11-01"
+      "rows": 504,
+      "added": 7,
+      "last_date": "2026-11-02"
     },
     {
       "job": "erp_monthly",
       "label": "隐含股权风险溢价",
       "ok": true,
-      "rows": 218,
-      "added": 0,
-      "last_date": "2026-10-01"
+      "rows": 219,
+      "added": 1,
+      "last_date": "2026-11-01"
     },
     {
       "job": "erp_annual",
