@@ -1,54 +1,54 @@
 {
-  "run_at_utc": "2026-11-02T21:47:47+00:00",
+  "run_at_utc": "2026-11-03T03:28:24+00:00",
   "full": false,
   "jobs": [
     {
       "job": "real_rates",
       "label": "实际利率期限结构",
       "ok": true,
-      "rows": 16194,
-      "added": 0,
-      "last_date": "2026-10-30"
+      "rows": 16195,
+      "added": 1,
+      "last_date": "2026-11-02"
     },
     {
       "job": "inflation_expectations",
       "label": "通胀预期",
       "ok": true,
-      "rows": 586,
-      "added": 0,
-      "last_date": "2026-10-01"
+      "rows": 587,
+      "added": 1,
+      "last_date": "2026-11-01"
     },
     {
       "job": "equity_indices",
       "label": "股指",
       "ok": true,
       "rows": 14055,
-      "added": 1,
+      "added": 0,
       "last_date": "2026-10-30"
     },
     {
       "job": "gold",
       "label": "黄金",
       "ok": true,
-      "rows": 14720,
-      "added": 0,
-      "last_date": "2026-11-02",
+      "rows": 14721,
+      "added": 1,
+      "last_date": "2026-11-03",
       "source": "gold-api.com（备用）"
     },
     {
       "job": "bitcoin",
       "label": "比特币",
       "ok": true,
-      "rows": 4124,
-      "added": 0,
-      "last_date": "2026-11-02"
+      "rows": 4125,
+      "added": 1,
+      "last_date": "2026-11-03"
     },
     {
       "job": "gpu_rental",
       "label": "GPU租赁指数",
       "ok": true,
       "rows": 504,
-      "added": 7,
+      "added": 0,
       "last_date": "2026-11-02"
     },
     {
@@ -56,7 +56,7 @@
       "label": "隐含股权风险溢价",
       "ok": true,
       "rows": 219,
-      "added": 1,
+      "added": 0,
       "last_date": "2026-11-01"
     },
     {
