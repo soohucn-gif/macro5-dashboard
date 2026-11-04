@@ -1,5 +1,5 @@
 {
-  "run_at_utc": "2026-11-04T02:18:34+00:00",
+  "run_at_utc": "2026-11-04T06:17:02+00:00",
   "full": false,
   "jobs": [
     {
@@ -7,7 +7,7 @@
       "label": "实际利率期限结构",
       "ok": true,
       "rows": 16196,
-      "added": 1,
+      "added": 0,
       "last_date": "2026-11-03"
     },
     {
@@ -22,16 +22,16 @@
       "job": "equity_indices",
       "label": "股指",
       "ok": true,
-      "rows": 14056,
-      "added": 0,
-      "last_date": "2026-11-02"
+      "rows": 14057,
+      "added": 1,
+      "last_date": "2026-11-03"
     },
     {
       "job": "gold",
       "label": "黄金",
       "ok": true,
       "rows": 14722,
-      "added": 1,
+      "added": 0,
       "last_date": "2026-11-04",
       "source": "gold-api.com（备用）"
     },
@@ -40,7 +40,7 @@
       "label": "比特币",
       "ok": true,
       "rows": 4126,
-      "added": 1,
+      "added": 0,
       "last_date": "2026-11-04"
     },
     {
@@ -48,7 +48,7 @@
       "label": "GPU租赁指数",
       "ok": true,
       "rows": 511,
-      "added": 7,
+      "added": 0,
       "last_date": "2026-11-03"
     },
     {
