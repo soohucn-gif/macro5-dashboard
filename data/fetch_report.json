@@ -1,5 +1,5 @@
 {
-  "run_at_utc": "2026-11-08T05:58:17+00:00",
+  "run_at_utc": "2026-11-09T01:43:18+00:00",
   "full": false,
   "jobs": [
     {
@@ -30,26 +30,26 @@
       "job": "gold",
       "label": "黄金",
       "ok": true,
-      "rows": 14726,
-      "added": 0,
-      "last_date": "2026-11-08",
+      "rows": 14727,
+      "added": 1,
+      "last_date": "2026-11-09",
       "source": "gold-api.com（备用）"
     },
     {
       "job": "bitcoin",
       "label": "比特币",
       "ok": true,
-      "rows": 4130,
-      "added": 0,
-      "last_date": "2026-11-08"
+      "rows": 4131,
+      "added": 1,
+      "last_date": "2026-11-09"
     },
     {
       "job": "gpu_rental",
       "label": "GPU租赁指数",
       "ok": true,
-      "rows": 539,
-      "added": 0,
-      "last_date": "2026-11-07"
+      "rows": 546,
+      "added": 7,
+      "last_date": "2026-11-08"
     },
     {
       "job": "erp_monthly",
