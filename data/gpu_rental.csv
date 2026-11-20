@@ -615,3 +615,10 @@ date,gpu,segment,usd_per_hr
 2026-11-18,H100,neo-cloud,3.01
 2026-11-18,H200,neo-cloud,3.76
 2026-11-18,MI300X,neo-cloud,2.78
+2026-11-19,A100,hyperscaler,3.92
+2026-11-19,A100,neo-cloud,1.64
+2026-11-19,B200,neo-cloud,6.94
+2026-11-19,H100,hyperscaler,7.08
+2026-11-19,H100,neo-cloud,3.11
+2026-11-19,H200,neo-cloud,3.74
+2026-11-19,MI300X,neo-cloud,2.78
